@@ -5,7 +5,7 @@ from enum import Enum, auto
 
 import pymunk
 
-from .config import COMPONENTS
+from .geometry import Geometry, geometry_for
 
 
 class RoundState(Enum):
@@ -27,14 +27,21 @@ class Piece:
     uid: int
     level: int
     body: pymunk.Body
-    shape: pymunk.Circle
+    shapes: tuple[pymunk.Poly, ...]
     born_at: float
     overflow_time: float = 0.0
 
     @property
-    def radius(self) -> int:
-        """Le rayon reste défini dans le catalogue, sans duplication."""
-        return COMPONENTS[self.level].radius
+    def geometry(self) -> Geometry:
+        """Tous les exemplaires d'un niveau partagent la même description."""
+        return geometry_for(self.level)
+
+    @property
+    def bounds(self) -> pymunk.BB:
+        """Union des boîtes des polygones tournés, actualisée même hors step."""
+        boxes = [shape.cache_bb() for shape in self.shapes]
+        return pymunk.BB(min(b.left for b in boxes), min(b.bottom for b in boxes),
+                         max(b.right for b in boxes), max(b.top for b in boxes))
 
 
 @dataclass(frozen=True)
@@ -51,3 +58,5 @@ class GameEvent:
     level: int = 0
     points: int = 0
     combo: int = 0
+    uid: int | None = None      # destinataire d'une expression, si applicable
+    strength: float = 0.0       # choc exprimé comme variation de vitesse

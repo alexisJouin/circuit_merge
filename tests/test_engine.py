@@ -37,8 +37,12 @@ class PhysicsTests(unittest.TestCase):
         self.assertEqual(sorted(p.level for p in engine.pieces.values()), [0, 1])
         self.assertEqual(engine.score, 0)
         a, b = engine.pieces.values()
-        self.assertGreaterEqual((a.body.position - b.body.position).length,
-                                a.radius + b.radius - 1)
+        # Les contacts se font sur les polygones, avec une petite tolérance
+        # numérique. Un test de distance entre centres serait faux en V2.
+        for shape in a.shapes:
+            for contact in engine.space.shape_query(shape):
+                if contact.shape in b.shapes:
+                    self.assertTrue(all(p.distance >= -0.8 for p in contact.contact_point_set.points))
 
     def test_three_simultaneous_contacts_consume_each_piece_once(self):
         engine = GameEngine(3)
@@ -76,21 +80,21 @@ class PhysicsTests(unittest.TestCase):
         expected_next = engine.next_level
         self.assertTrue(engine.drop(-5000))
         piece = next(iter(engine.pieces.values()))
-        self.assertGreaterEqual(piece.body.position.x - piece.radius,
+        self.assertGreaterEqual(piece.bounds.left,
                                 C.LEFT + C.WALL_THICKNESS)
         self.assertEqual(engine.current_level, expected_next)
         self.assertFalse(engine.drop())
         advance(engine, C.DROP_INTERVAL)
         self.assertTrue(engine.drop(5000))
         latest = list(engine.pieces.values())[-1]
-        self.assertLessEqual(latest.body.position.x + latest.radius,
+        self.assertLessEqual(latest.bounds.right,
                              C.RIGHT - C.WALL_THICKNESS)
 
     def test_floor_stops_fall_and_body_settles(self):
         engine = GameEngine(1)
         piece = engine.add_piece(4, (600, 300))
         advance(engine, 6)
-        self.assertAlmostEqual(piece.body.position.y + piece.radius,
+        self.assertAlmostEqual(piece.bounds.top,
                                C.FLOOR - C.WALL_THICKNESS, delta=1)
         self.assertLess(piece.body.velocity.length, 2)
         self.assertIs(engine.state, RoundState.PLAYING)
@@ -106,7 +110,7 @@ class PhysicsTests(unittest.TestCase):
                     for p in engine.pieces.values():
                         self.assertTrue(math.isfinite(p.body.position.x))
                         self.assertTrue(math.isfinite(p.body.position.y))
-                        self.assertLessEqual(p.body.position.y + p.radius,
+                        self.assertLessEqual(p.bounds.top,
                                              C.FLOOR - C.WALL_THICKNESS + 4)
                     if engine.state is RoundState.GAME_OVER:
                         break

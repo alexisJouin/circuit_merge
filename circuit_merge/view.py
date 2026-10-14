@@ -14,6 +14,8 @@ from . import config as C
 from .art import SpriteCache, draw_component
 from .engine import GameEngine
 from .model import GameEvent, RoundState
+from .faces import Personality
+from .geometry import geometry_for, landing_y
 
 
 @dataclass
@@ -51,6 +53,11 @@ class View:
         self.particles: list[Particle] = []
         self.visual_rng = random.Random(42)  # indépendant des tirages de la partie
         self.goal_time = 0.0
+        self.goal_label = ""
+        self.personalities: dict[int, Personality] = {}
+        self.preview_face = Personality(-1)
+        self._projection_key = None
+        self._projection_y = C.FLOOR
         self.toast = ""
         self.toast_time = 0.0
         self.buttons: dict[str, pygame.Rect] = {}
@@ -122,6 +129,8 @@ class View:
         """Convertit les événements métier en effets visuels."""
         for event in events:
             if event.kind == "merge":
+                if event.uid is not None:
+                    self.face_for(event.uid).react("joy", 1.2)
                 self.effects.append(Effect(event.x, event.y, event.level, event.points))
                 for _ in range(12):
                     angle = self.visual_rng.uniform(0, math.tau)
@@ -130,10 +139,20 @@ class View:
                                                    math.sin(angle) * speed,
                                                    C.COMPONENTS[event.level].color,
                                                    self.visual_rng.uniform(0.35, 0.65)))
-            elif event.kind == "goal":
+            elif event.kind in ("goal", "circuit"):
                 self.goal_time = 4.0
+                self.goal_label = ("SUPERCALCULATEUR ASSEMBLÉ !" if event.kind == "goal"
+                                   else "CIRCUIT TERMINÉ  ·  BRAVO !")
+            elif event.kind == "ouch" and event.uid is not None:
+                self.face_for(event.uid).react("ouch", 0.35 + min(0.3, event.strength / 1500))
 
-    def animate(self, dt: float) -> None:
+    def face_for(self, uid: int) -> Personality:
+        """Crée un état visuel seulement au premier accès à cette instance."""
+        if uid not in self.personalities:
+            self.personalities[uid] = Personality(uid)
+        return self.personalities[uid]
+
+    def animate(self, dt: float, engine: GameEngine) -> None:
         """Vie des décorations. L'application suspend ceci pendant la pause."""
         for effect in self.effects:
             effect.age += dt
@@ -146,13 +165,22 @@ class View:
         self.particles = [p for p in self.particles if p.life > 0]
         self.goal_time = max(0.0, self.goal_time - dt)
         self.toast_time = max(0.0, self.toast_time - dt)
+        # Supprime les visages consommés par fusion, sans garder les anciens corps.
+        self.personalities = {uid: face for uid, face in self.personalities.items()
+                              if uid in engine.pieces}
+        for uid in engine.pieces:
+            self.face_for(uid).advance(dt)
+        self.preview_face.advance(dt)
 
-    def bubble(self, level: int, x: float, y: float, radius: int | None = None,
-               angle: float = 0, alpha: int = 255) -> None:
-        """Dessine un composant tournant ; la collision ne dépend pas du sprite."""
-        sprite = self.sprites.get(level, radius)
+    def component(self, level: int, x: float, y: float, icon_half_size: int | None = None,
+               angle: float = 0, alpha: int = 255,
+               personality: Personality | None = None, expression: str = "idle",
+               gaze=(0, 0)) -> None:
+        """Dessine la silhouette et sa face ; aucune modification de la physique."""
+        sprite = (self.sprites.character(level, personality, expression, gaze)
+                  if icon_half_size is None else self.sprites.get(level, icon_half_size))
         if abs(angle) > 0.01:
-            sprite = pygame.transform.rotate(sprite, -math.degrees(angle) % 360)
+            sprite = pygame.transform.rotozoom(sprite, -math.degrees(angle) % 360, 1)
         if alpha != 255:
             sprite = sprite.copy()
             sprite.set_alpha(alpha)
@@ -168,18 +196,18 @@ class View:
         draw_component(self.canvas, 5, (48, 48), 39)
         self.text("CIRCUIT", (78, 26), 36)
         self.text("MERGE", (200, 26), 36, C.TEAL)
-        self.text("Deux composants. Une évolution.", (79, 66), 20, C.MUTED)
+        self.text("V2 · Des composants qui prennent vie.", (79, 66), 20, C.MUTED)
         self.button("sound", "Muet" if muted else "Son", (846, 28, 72, 40), mouse)
         self.button("pause", "Pause", (928, 28, 91, 40), mouse)
         self.button("help", "?", (1029, 28, 58, 40), mouse)
         self._left_panel(engine, best, mouse, debug, fps, slow)
-        self._bucket(engine, debug, mode is None)
+        self._bucket(engine, debug, mode is None, mouse)
         self._right_panel(engine, mouse, debug, inspect_uid)
         self._effects()
 
         # Pied de bac avec état de disponibilité.
         self.text("ATELIER DE FUSION", (556, 823), 20, C.TEAL, True)
-        instruction = "Clic / relâcher ou ESPACE pour lâcher"
+        instruction = "ESPACE : lâcher  ·  E / molette : tourner"
         if not engine.can_drop and engine.state is RoundState.PLAYING:
             instruction = "Composant en cours de lâcher…"
         if debug:
@@ -187,7 +215,7 @@ class View:
         self.text(instruction, (556, 853), 20, C.MUTED, True)
         if self.goal_time > 0:
             self.panel((333, 112, 446, 49), C.ORANGE)
-            self.text("SUPERCALCULATEUR ASSEMBLÉ !", (556, 137), 26, C.ORANGE, True)
+            self.text(self.goal_label, (556, 137), 26, C.ORANGE, True)
         elif engine.recent_combo > 1:
             self.text(f"FUSIONS EN CHAÎNE  ·  {engine.recent_combo}", (556, 121), 22, C.ORANGE, True)
         if self.toast_time > 0:
@@ -221,7 +249,7 @@ class View:
 
         self.panel((32, 510, 244, 253))
         self.text("COMMENT JOUER", (53, 532), 20, C.MUTED)
-        for n, title, detail, y in (("1", "Visez", "Déplacez la souris ou utilisez les flèches.", 570),
+        for n, title, detail, y in (("1", "Placez", "Souris : viser. E / molette : tourner.", 570),
                                    ("2", "Lâchez", "Relâchez le clic ou appuyez sur Espace.", 633),
                                    ("3", "Fusionnez", "Deux niveaux identiques donnent le suivant.", 696)):
             pygame.draw.circle(self.canvas, C.PANEL_LIGHT, (65, y + 10), 14)
@@ -236,7 +264,7 @@ class View:
             self.text(f"{fps:.0f} FPS  |  {len(engine.pieces)} corps  |  " + ("×0,25" if slow else "×1"),
                       (33, 884), 16, C.MUTED)
 
-    def _bucket(self, engine, debug, aiming):
+    def _bucket(self, engine, debug, aiming, mouse):
         inside = pygame.Rect(int(C.LEFT), int(C.WALL_TOP), int(C.RIGHT - C.LEFT), int(C.FLOOR - C.WALL_TOP))
         pygame.draw.rect(self.canvas, (15, 30, 39), inside, border_radius=12)
         for x in range(int(C.LEFT) + 20, int(C.RIGHT), 28):
@@ -260,38 +288,53 @@ class View:
             pygame.draw.circle(self.canvas, C.TEAL, (int(x), int(C.WALL_TOP)), 5)
 
         if aiming and engine.state is RoundState.PLAYING:
-            radius = C.COMPONENTS[engine.current_level].radius
-            # Projection verticale contre les disques déjà présents. C'est une
-            # aide de visée, pas une prédiction du rebond ou des futures fusions.
-            landing_y = C.FLOOR - C.WALL_THICKNESS - radius
-            for piece in engine.pieces.values():
-                dx = abs(piece.body.position.x - engine.aim_x)
-                distance = radius + piece.radius
-                if dx < distance:
-                    y = piece.body.position.y - math.sqrt(distance ** 2 - dx ** 2)
-                    if y >= C.DROP_Y:
-                        landing_y = min(landing_y, y)
-            for y in range(round(C.DROP_Y + radius + 8), round(landing_y), 15):
+            geometry = geometry_for(engine.current_level)
+            _, top, _, bottom = geometry.bounds(engine.aim_angle)
+            # SAT sur les vrais polygones. Actualisation à 12 Hz pour conserver
+            # de bonnes performances lorsque le bac contient beaucoup de pièces.
+            key = (round(engine.aim_x), engine.aim_angle, engine.current_level,
+                   int(engine.time * 12), len(engine.pieces))
+            if key != self._projection_key:
+                self._projection_y = landing_y(engine.current_level, engine.aim_x,
+                    engine.aim_angle, engine.pieces.values(), C.DROP_Y,
+                    C.FLOOR - C.WALL_THICKNESS)
+                self._projection_key = key
+            for y in range(round(C.DROP_Y + bottom + 8), round(self._projection_y), 15):
                 pygame.draw.circle(self.canvas, (72, 115, 116), (round(engine.aim_x), y), 2)
-            pygame.draw.circle(self.canvas, (53, 103, 99), (round(engine.aim_x), round(landing_y)), radius, 1)
-            self.bubble(engine.current_level, engine.aim_x, C.DROP_Y,
-                        alpha=255 if engine.can_drop else 95)
+            self.component(engine.current_level, engine.aim_x, self._projection_y,
+                        angle=engine.aim_angle, alpha=48)
+            self.component(engine.current_level, engine.aim_x, C.DROP_Y,
+                        angle=engine.aim_angle, alpha=255 if engine.can_drop else 95,
+                        personality=self.preview_face)
             self.text(C.COMPONENTS[engine.current_level].name,
-                      (engine.aim_x, C.DROP_Y - radius - 17), 20, C.TEXT, True)
+                      (engine.aim_x, C.DROP_Y + top - 20), 20, C.TEXT, True)
+            self.text(f"{math.degrees(engine.aim_angle):.0f}°", (engine.aim_x, C.DROP_Y + bottom + 13),
+                      16, C.TEAL, True)
 
         for piece in engine.pieces.values():
             x, y = piece.body.position
-            self.bubble(piece.level, x, y, angle=piece.body.angle)
+            personality = self.face_for(piece.uid)
+            expression = personality.expression(piece.body.velocity.y, piece.body.angular_velocity,
+                                                  piece.overflow_time)
+            # La souris en coordonnées locales : les pupilles tournent avec la tête.
+            target = piece.body.world_to_local(mouse) if mouse != (-1, -1) else (0, 0)
+            gaze = (max(-1, min(1, target[0] / 130)), max(-1, min(1, target[1] / 130)))
+            self.component(piece.level, x, y, angle=piece.body.angle, personality=personality,
+                        expression=expression, gaze=gaze)
             if debug:
-                pygame.draw.circle(self.canvas, (237, 250, 250), (round(x), round(y)), piece.radius, 1)
+                for shape in piece.shapes:
+                    points = [piece.body.local_to_world(v) for v in shape.get_vertices()]
+                    pygame.draw.polygon(self.canvas, (235, 250, 250), points, 1)
+                pygame.draw.line(self.canvas, C.TEAL, (x - 3, y), (x + 3, y), 1)
+                pygame.draw.line(self.canvas, C.TEAL, (x, y - 3), (x, y + 3), 1)
                 end = (round(x + piece.body.velocity.x * 0.12), round(y + piece.body.velocity.y * 0.12))
                 pygame.draw.line(self.canvas, C.RED, (round(x), round(y)), end, 2)
-                self.text(f"#{piece.uid}", (x, y + piece.radius - 8), 16, C.BG, True)
+                self.text(f"#{piece.uid}", (x, y + 7), 16, C.TEAL, True)
 
     def _right_panel(self, engine, mouse, debug, inspect_uid):
         self.panel((836, 112, 252, 133), C.ORANGE)
         self.text("SUIVANT", (856, 132), 20, C.MUTED)
-        self.bubble(engine.next_level, 878, 196, 29)
+        self.component(engine.next_level, 878, 196, 29)
         self.wrapped(C.COMPONENTS[engine.next_level].name, 922, 176, 146, 24, C.TEXT, 26)
         self.text("Anticipez le placement", (922, 215), 16, C.MUTED)
 
@@ -302,7 +345,7 @@ class View:
             active = level <= engine.highest_level
             if level == engine.highest_level:
                 pygame.draw.rect(self.canvas, C.PANEL_LIGHT, (848, y - 16, 228, 33), border_radius=7)
-            self.bubble(level, 870, y, 13, alpha=255 if active else 80)
+            self.component(level, 870, y, 13, alpha=255 if active else 80)
             self.text(f"{level + 1:02d}", (891, y - 8), 18, spec.color if active else C.MUTED)
             self.text(spec.name, (918, y - 9), 20, C.TEXT if active else (112, 136, 150))
 
@@ -313,8 +356,8 @@ class View:
         self.text("LE SAVIEZ-VOUS ?" if not piece else f"PIÈCE #{piece.uid}  ·  NIVEAU {level + 1}",
                   (855, 772), 18, C.TEAL)
         if piece:
-            self.text(spec.name, (855, 796), 22)
-            self.text(f"r = {piece.radius} px  |  m = {piece.body.mass:.2f}", (855, 822), 18, C.MUTED)
+            self.text(f"{C.NICKNAMES[level]} · {spec.short}", (855, 796), 22)
+            self.text(f"{len(piece.shapes)} polygones  |  m = {piece.body.mass:.2f}", (855, 822), 18, C.MUTED)
             self.text(f"v = {piece.body.velocity.length:.1f} px/s", (855, 846), 18, C.MUTED)
         else:
             self.wrapped(spec.role, 855, 799, 213, 20, leading=22)
@@ -323,7 +366,7 @@ class View:
         for effect in self.effects:
             color = C.COMPONENTS[effect.level].color
             if effect.age < 0.45:
-                radius = int(C.COMPONENTS[effect.level].radius * (0.6 + effect.age * 1.5))
+                radius = int(C.COMPONENTS[effect.level].size * (0.6 + effect.age * 1.5))
                 pygame.draw.circle(self.canvas, color, (round(effect.x), round(effect.y)), max(1, radius), 2)
             self.text(f"+{effect.points}", (effect.x, effect.y - 25 - effect.age * 62), 28, C.TEXT, True)
         for p in self.particles:
@@ -342,9 +385,10 @@ class View:
                          339, 316, 442, 24, C.TEXT, 27)
             self.wrapped("Évitez de dépasser la limite pendant 2 secondes. Les nouveaux composants ont un court délai de tolérance.",
                          339, 398, 442, 22, C.MUTED, 25)
-            self.text("Flèches / Q D : viser    Espace : lâcher", (339, 486), 22)
-            self.text("P / Échap : pause    M : son    R : recommencer", (339, 519), 22)
-            self.text("F1 : mode NSI    F2 : ralenti    F11 : plein écran", (339, 552), 22, C.TEAL)
+            self.text("Gauche / droite : viser    Espace : lâcher", (339, 470), 22)
+            self.text("E / haut / molette : tourner    Bas : sens inverse", (339, 500), 22)
+            self.text("P / Échap : pause    M : son    R : recommencer", (339, 530), 22)
+            self.text("F1 : polygones    F2 : ralenti    F11 : plein écran", (339, 560), 22, C.TEAL)
             self.button("close", "C'est parti", (421, 601, 278, 44), mouse, True)
         elif mode == "restart":
             self.text("Nouvelle partie ?", (560, 299), 36, C.TEXT, True)

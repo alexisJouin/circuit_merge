@@ -1,37 +1,68 @@
-# Circuit Merge
+# Circuit Merge V2 — les composants prennent vie
 
-Un jeu Python de chute et de fusion inspiré de la mécanique classique de
-Fruit Merge / Suika, dans un univers informatique et électronique.
+Un jeu Python de chute et de fusion inspiré de Fruit Merge / Suika,
+avec onze composants électroniques, des visages animés et une physique
+qui suit leur silhouette. Code et supports pédagogiques en français.
 
-**Visez, lâchez, fusionnez : de la résistance au supercalculateur.**
+![Circuit Merge V2](apercu_v2.png)
 
-![Un montage dans Circuit Merge](apercu.png)
+## Nouveautés de la V2
 
-## Démarrer sous Windows
+- **Des personnages** : yeux, pupilles qui suivent la souris, bouche et joues.
+  Chacun cligne à son rythme. Surprise en chute, vertige en rotation, grimace
+  après un choc, inquiétude près du débordement et sourire après une fusion.
+  Ils font aussi occasionnellement un clin d'œil et une petite grimace.
+- **Des silhouettes physiques** : résistance horizontale, LED bombée, boîtiers,
+  broches, RAM allongée, cartes et trois baies de calcul. Un corps rigide porte
+  plusieurs polygones convexes : les espaces entre les pattes restent libres.
+- **Une rotation avant le lâcher**, par pas de 15°. Une RAM horizontale ne prend
+  pas la même place qu'une RAM verticale ; les composants peuvent basculer,
+  glisser, s'appuyer sur leurs broches et accrocher leurs voisins.
+- **Une visée adaptée** : fantôme de la vraie silhouette et projection verticale
+  sur les polygones. Les limites de visée et de débordement suivent l'orientation.
+- **Une physique à 240 Hz** et un calcul du centre de masse / de l'inertie par
+  partie. Les coins sont chanfreinés et les pattes suffisamment épaisses pour
+  rester lisibles et jouables. Ce sont des silhouettes stylisées en 2D.
+- **Les dépendances qui fonctionnent sont conservées** : `pygame-ce==2.5.8` et
+  `pymunk==7.3.0`, installées uniquement à partir de paquets précompilés.
 
-1. **Extraire entièrement l'archive ZIP** dans un dossier accessible en écriture.
-2. Disposer de **Python 3.12**, conseillé pour cette version. Python 3.10 à 3.13
-   sont les versions visées ; les tests fournis ont été exécutés avec Python 3.12
-   sous Linux. Le programme reste une application Python, pas un APK Android.
-3. Double-cliquer sur **Installer_Windows.bat**. Il crée un environnement `.venv`
-   et installe les deux dépendances. Une connexion est nécessaire à cette étape.
-4. Double-cliquer sur **Lancer_Windows.bat**. Les lancements suivants fonctionnent
-   hors ligne. La console affiche un message si Python ou une dépendance manque.
+![Les onze personnages](personnages_v2.png)
 
-Installation manuelle depuis PowerShell, ouvert dans le dossier extrait :
+## Installer sous Windows
+
+1. Extraire **entièrement** le ZIP dans un nouveau dossier, par exemple
+   `Circuit_Merge_V2`. Garder la V1 à côté permet de comparer les deux physiques.
+2. Utiliser Python **3.10 à 3.14** ; Python **3.12** est conseillé. Les tests de
+   cette livraison ont été exécutés sous Linux avec Python 3.12.
+3. Double-cliquer sur **Installer_Windows.bat**, puis sur **Lancer_Windows.bat**.
+   Une connexion est nécessaire pour installer les dépendances ; ensuite le jeu
+   fonctionne hors ligne. Le code importe `pygame`, fourni ici par **pygame-ce**.
+
+L'installateur retire l'ancienne distribution `pygame` dans l'environnement
+local du projet, installe les versions épinglées et vérifie `pygame.IS_CE`.
+Il évite ainsi la compilation qui pouvait produire l'erreur
+`setuptools._distutils.msvccompiler`. Ne pas installer `pygame` et `pygame-ce`
+simultanément : ils partagent le nom de module `pygame`.
+
+Depuis PowerShell dans le dossier extrait, installation manuelle :
 
 ```powershell
 py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe main.py
 ```
 
-La commande `py` nécessite le lanceur Python de Windows. S'il n'est pas
-disponible, remplacer `py -3` par le chemin de l'interpréteur ou par `python`.
-Le script de lancement utilise `.venv` lorsqu'il existe. Pour un IDE tel que
-Thonny ou PyCharm, sélectionner cet interpréteur et ouvrir `main.py`.
+Si `py` manque, utiliser `python` ou le chemin de l'interpréteur. Pour choisir
+explicitement Python 3.12 : `py -3.12 -m venv .venv`, avant de créer ce dossier.
+Dans Thonny / PyCharm, sélectionner `.venv\Scripts\python.exe` comme interpréteur.
 
-## Démarrer sous Linux / macOS
+**Pour mettre à jour ton dossier existant qui fonctionne déjà**, copier les
+fichiers de la V2 dans ce dossier en conservant son `.venv`. Les versions des
+dépendances sont identiques. Le dossier `circuit_merge` contient le nouveau
+code ; vérifier qu'il a bien été remplacé, puis lancer `Lancer_Windows.bat`.
+
+## Linux / macOS
 
 ```bash
 python3 -m venv .venv
@@ -39,160 +70,147 @@ python3 -m venv .venv
 .venv/bin/python main.py
 ```
 
-On peut ensuite utiliser `sh lancer.sh`. Si la création d'un environnement est
-indisponible sur Linux, installer le paquet `python3-venv` adapté au système.
+Puis utiliser `sh lancer.sh`. Si `venv` est absent sous Linux, installer le
+paquet `python3-venv` du système. La livraison est une application Python
+pour ordinateur ; aucun APK Android n'est inclus.
 
-Pour une installation dans un interpréteur déjà configuré :
-
-```bash
-python -m pip install -r requirements.txt
-python main.py
-```
-
-## Contrôles
+## Commandes
 
 | Action | Commande |
 | --- | --- |
-| Viser | Souris, flèches gauche/droite, Q/D ou A/D |
+| Viser | Souris, gauche/droite, Q/D ou A/D |
+| Tourner avant de lâcher | E, flèche haute ou molette ; pas de 15° |
+| Tourner dans l'autre sens | Flèche basse ou molette inverse |
 | Lâcher | Clic puis relâcher dans le bac, ou Espace |
 | Pause / reprise | P ou Échap |
 | Recommencer | R ou bouton « Nouvelle partie » |
 | Son | M |
-| Aide | ? dans l'interface, H ou F3 |
-| Mode pédagogique NSI | F1 ou bouton « Mode NSI » |
+| Aide | ?, H ou F3 |
+| Mode NSI | F1 |
 | Ralenti ×0,25 | F2 |
-| Figer l'inspecteur d'une pièce | Clic droit en mode NSI |
+| Figer l'inspecteur | Clic droit en mode NSI |
 | Plein écran | F11 |
 
-En mode NSI, survoler un composant affiche son rayon, sa masse et sa vitesse.
-Le clic droit fixe cet inspecteur jusqu'à un clic droit dans le vide ou à la
-disparition de la pièce. Les cercles montrent les formes physiques ; les traits
-rouges montrent les vitesses avec un facteur d'échelle de 0,12 seconde.
-Le toucher SDL est aussi géré sur un écran tactile **d'ordinateur**.
+F1 montre les **polygones physiques**, le centre de masse et les vecteurs
+vitesse. L'inspecteur affiche le nombre de polygones, la masse et la vitesse.
+F2 ralentit aussi les expressions. Pause et menus figent physique et visages.
+Le toucher SDL est géré sur un écran tactile d'ordinateur ; tourner se fait
+au clavier ou à la molette.
 
 ## Règles
 
-- Deux composants du même niveau qui se touchent deviennent un seul composant
-  du niveau suivant, plus grand. Les autres contacts produisent des rebonds et
-  du roulement. Les sprites tournent avec les corps physiques.
-- Seuls les cinq premiers niveaux peuvent apparaître dans la file de lâcher.
-  Leur tirage est pondéré, pour favoriser les petits objets. Le prochain objet
-  est toujours annoncé à droite ; les objets supérieurs se créent par fusion.
-- Le score vient des fusions : la création d'une LED rapporte 3 points, celle
-  d'un condensateur 6, etc. Les fusions rapprochées affichent un indicateur de
-  chaîne, **sans multiplicateur de score**.
-- Le délai entre deux lâchers est de 0,38 seconde. La visée est bornée pour
-  tenir compte du rayon et de l'épaisseur des parois.
-- La partie se termine lorsqu'une même pièce dépasse la ligne de sécurité
-  pendant **2 secondes continues**, après **1,15 seconde de tolérance** suivant
-  sa création. Un retour sous la ligne remet son compteur à zéro.
-- Créer un supercalculateur est l'objectif. La partie continue pour améliorer
-  le score. Deux supercalculateurs qui se touchent disparaissent, rapportent
-  132 points et libèrent le bac ; un « circuit terminé » est comptabilisé.
-- La ligne pointillée de visée est une projection verticale simplifiée : elle
-  ne prédit ni le rebond, ni le roulement, ni les fusions futures.
+Deux composants du même niveau se touchant deviennent le suivant. Le contact
+peut venir d'une patte ou du boîtier. La paire ne fusionne qu'une seule fois,
+même si plusieurs de ses polygones se touchent. Les contacts entre niveaux
+différents produisent des mouvements physiques.
 
-La progression électronique est une convention de jeu : deux résistances ne
-fabriquent pas réellement une LED. Les encarts expliquent le rôle des composants.
+Seuls les cinq petits niveaux apparaissent au lâcher, avec les poids 32, 27,
+20, 14 et 7. La file annonce toujours le prochain composant. Une pression
+refusée par le délai de 0,38 s ne modifie pas cette file.
 
-## Ce qui est reproduit et ce qui est adapté
+Le score vient des fusions : LED 3, condensateur 6, transistor 10, etc.
+L'indicateur de chaîne n'est pas un multiplicateur. Le joueur vise le
+supercalculateur. Deux supercalculateurs se retirent, libèrent le bac et
+rapportent 132 points ; la partie peut continuer.
 
-Les éléments centraux reproduits sont le bac ouvert, la chute d'un objet à la
-fois, les collisions circulaires, les rotations, l'empilement, la fusion au
-contact, les tailles croissantes, le prochain objet, le score et le débordement.
-Le thème, les illustrations et les sons sont propres à Circuit Merge.
+Le débordement utilise **le sommet réel de la silhouette tournée**, pattes
+comprises. Une même pièce doit dépasser la ligne pendant **2 secondes
+continues**, après **1,15 seconde de grâce** suivant sa création. Son retour
+sous la ligne remet son compteur à zéro.
 
-Plusieurs jeux Android portent le nom « Fruit Merge ». Cette version se base
-sur la mécanique classique, notamment décrite dans la fiche de **Fruit Merge:
-Match Game** ; elle ne prétend pas retrouver les paramètres internes de cette
-application. Gravité, tailles, délais et restitution ont été réglés pour ce
-projet et sont facilement modifiables dans `circuit_merge/config.py`.
+Le fantôme prévoit le premier contact lors d'une descente verticale à
+orientation constante, avec les voisins dans leur position actuelle. Il ne
+prédit pas les rebonds, les rotations ultérieures ni les fusions.
 
-## Sauvegarde
+La progression est ludique : deux résistances ne fabriquent pas une LED.
+Les pattes sont rigides et les composants ne sont ni déformables ni simulés
+en 3D. Le dessin stylise la silhouette ; les détails internes et le visage
+sont décoratifs. Les paramètres n'ont pas été extraits du jeu Android.
 
-Le record, le son et la partie sont enregistrés automatiquement toutes les
-10 secondes, à la fermeture, à la pause et en fin de partie.
+## Sauvegardes V1 / V2
 
-- Windows : `%LOCALAPPDATA%\CircuitMerge\save.json`.
-- Linux / macOS : `~/CircuitMerge/save.json`.
-- Choisir un autre fichier : `python main.py --save-file sauvegardes/alexis.json`.
-- Ignorer la partie interrompue : `python main.py --fresh` (le record est gardé).
+Record, son, file de lâcher, orientation choisie et partie sont enregistrés
+toutes les 10 s, à la fermeture, à la pause et en fin de partie.
 
-Une partie restaurée démarre en pause. Les tirages aléatoires futurs sont
-conservés. Les contacts physiques sont recalculés : la reprise n'est pas une
-répétition exacte, image par image. Une sauvegarde JSON illisible est conservée
-sous un nom `save_corrompue_…json` lorsque le disque le permet.
+- Windows : `%LOCALAPPDATA%\CircuitMerge\save_v2.json`.
+- Linux / macOS : `~/CircuitMerge/save_v2.json`.
+- Un autre fichier : `python main.py --save-file sauvegardes/alexis.json`.
+- Nouveau montage en gardant le record : `python main.py --fresh`.
+
+Si la V2 n'a pas encore de sauvegarde, elle lit automatiquement l'ancien
+`save.json` de la V1. Le record et la partie sont repris ; les disques sont
+convertis en silhouettes et une nouvelle grâce laisse la pile se réarranger.
+**Le fichier V1 reste intact.** La reprise démarre en pause.
+
+Les contacts physiques sont recalculés et les clignements recommencent : la
+sauvegarde conserve la partie et les futurs tirages, pas une répétition bit
+à bit. Une sauvegarde V2 corrompue est conservée sous un nom distinct quand
+le disque le permet. Une V1 corrompue est simplement laissée en place.
 
 ## Pour le cours de NSI
 
-- **`docs/GUIDE_NSI.md`** : architecture, lectures guidées, physique, algorithmes,
-  invariants, pièges et expériences.
-- **`docs/SUJET_PROJET_NSI.md`** : sujet distribuable, étapes, rôles, livrables
-  et proposition de barème sur 20.
-- **`docs/NOTES_ENSEIGNANT.md`** : pistes de correction des fonctions élèves,
-  différenciation et idées de prolongements.
-- **`atelier_nsi/regles_a_completer.py`** : cinq fonctions élèves, sans dépendance.
-- **`experiences/chute_libre.py`** : comparaison simulation / modèle mathématique.
-- **`Circuit_Merge_Guide_NSI.pdf`** : manuel imprimable et sujet de projet réunis.
+- **`docs/GUIDE_NSI.md`** : couches du programme, pas fixe, formes composées,
+  centre de masse, fusions, expressions, visée et sauvegarde.
+- **`docs/SUJET_PROJET_NSI.md`** : sujet distribuable, huit séances et barème.
+- **`docs/NOTES_ENSEIGNANT.md`** : pistes de correction et différenciation.
+- **`atelier_nsi/regles_a_completer.py`** : fonctions simples du prototype
+  circulaire, pour commencer sans dépendance.
+- **`atelier_nsi/silhouettes_a_completer.py`** : exercices V2 sans bibliothèque
+  graphique : rotation, boîte englobante, visée et expression.
+- **`experiences/chute_libre.py`** : comparer simulation et formule continue.
+- **`experiences/occupation.py`** : dimensions à plusieurs angles.
+- **`docs/historique/`** : ancien manuel PDF et guide V1, conservés comme références.
+- **`docs/VALIDATION.md`** : tests exécutés et portée des vérifications.
 
-Le jeu complet sert de référence fonctionnelle. Distribuer seulement le sujet
-et le squelette élèves lorsqu'on souhaite les laisser chercher les règles.
-Les notes enseignant contiennent des pistes de solution ; elles peuvent être
-retirées de la copie distribuée à la classe.
+Le code complet est la référence fonctionnelle. Les TODO sont uniquement dans
+les squelettes élèves. Pour une recherche autonome, distribuer le sujet et
+les exercices, puis fournir les modules au fil des séances. Les notes
+enseignant peuvent être retirées de la copie destinée aux élèves.
 
-## Expérimenter et vérifier
+## Expériences et vérifications
 
 ```bash
-# Tirages reproductibles ; la même graine démarre le même nouveau montage.
 python main.py --fresh --seed 42
-
-# Montage de démonstration, sans modifier les sauvegardes.
 python main.py --demo
-
-# Étudier le pas de temps.
 python experiences/chute_libre.py
-
-# Tests automatisés de physique, sauvegarde et interface sans écran.
+python experiences/occupation.py
 python -m unittest discover -s tests -v
-
-# Test de lancement pendant 120 images, sans écrire de sauvegarde.
 python main.py --smoke-test 120 --mute
-
-# Capturer le montage de démonstration sans ouvrir de fenêtre.
 python main.py --demo --screenshot capture.png
 ```
 
-Les dépendances testées sont **Pygame 2.6.1** et **Pymunk 7.3.0**. Les tests
-utilisent `unittest`, inclus dans Python. Aucun téléchargement d'image, de son
-ou de police n'est nécessaire au lancement ; aucun serveur n'est utilisé.
+`--demo` utilise une pile illustrant plusieurs composants et le vrai moteur
+physique ; elle ne modifie pas les sauvegardes. Les captures et tests sans
+écran n'écrivent pas non plus de sauvegarde.
 
-## Organisation
+## Organisation du code
 
-```text
-circuit_merge/
-    main.py                         Lancement et options
-    circuit_merge/
-        config.py                   Réglages et catalogue
-        model.py                    Pièces, états et événements
-        engine.py                   Physique et règles
-        app.py                      Entrées et boucle de jeu
-        view.py                     Interface et animations
-        art.py                      Illustrations vectorielles
-        audio.py                    Sons générés
-        storage.py                  JSON et écritures atomiques
-    tests/                          Scénarios automatisés
-    experiences/                    Expérience de chute libre
-    atelier_nsi/                     Squelette élèves
-    docs/                           Supports pédagogiques
-```
+| Fichier | Responsabilité |
+| --- | --- |
+| `main.py` | Options et lancement |
+| `config.py` | Catalogue et paramètres |
+| `geometry.py` | Silhouettes, centre de masse, transformations et projection |
+| `model.py` | Pièces, état de partie et événements |
+| `engine.py` | Corps physiques, règles et fusions |
+| `faces.py` | Clignements, priorités des expressions et dessin des visages |
+| `art.py` | Silhouettes illustrées et cache graphique |
+| `view.py` | Interface, visages et effets |
+| `app.py` | Entrées, temps fixe et orchestration |
+| `audio.py` | Sons générés localement |
+| `storage.py` | Sauvegarde JSON et import V1 |
 
-## Sources et licence
+Les modules se trouvent dans `circuit_merge/`. Le moteur n'importe pas
+Pygame. La physique n'utilise **aucun cercle de collision pour les pièces**.
+Les cercles encore dessinés servent aux yeux, ventilateurs et effets visuels.
 
-- Mécanique de référence : [Fruit Merge: Match Game, Google Play](https://play.google.com/store/apps/details?id=com.melon.drop.fruit.merge.master).
-- Physique : [documentation officielle Pymunk](https://www.pymunk.org/en/latest/).
-- Affichage : [documentation officielle Pygame](https://www.pygame.org/docs/).
-- Versions utilisées : [Pygame sur PyPI](https://pypi.org/project/pygame/2.6.1/) et
-  [Pymunk sur PyPI](https://pypi.org/project/pymunk/7.3.0/).
+## Références et licence
 
-Code, dessins et documentation de ce projet : licence MIT, voir `LICENSE`.
-Les bibliothèques externes conservent leurs propres licences.
+- [Pymunk : corps et formes](https://www.pymunk.org/en/latest/pymunk.html).
+- [pygame-ce : documentation officielle](https://pyga.me/docs/).
+- [pygame-ce 2.5.8](https://pypi.org/project/pygame-ce/2.5.8/) et
+  [Pymunk 7.3.0](https://pypi.org/project/pymunk/7.3.0/).
+- [Fruit Merge: Match Game, référence de mécanique](https://play.google.com/store/apps/details?id=com.melon.drop.fruit.merge.master).
+
+Code, dessins et documentation : licence MIT, voir `LICENSE`.
+Les bibliothèques gardent leurs propres licences. Aucune image, police ou
+ressource audio n'est téléchargée pendant le jeu ; aucun serveur n'est utilisé.

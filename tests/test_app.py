@@ -62,7 +62,8 @@ class InterfaceTests(unittest.TestCase):
         self.assertTrue(self.app.debug)
         self.app.handle_event(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_F2))
         self.app.update(0.1)
-        self.assertAlmostEqual(self.app.engine.time, 0.025)
+        # Le temps restant dans l'accumulateur fait partie du temps à simuler.
+        self.assertAlmostEqual(self.app.engine.time + self.app.accumulator, 0.025)
 
     def test_focus_loss_pauses_and_coordinate_mapping_survives_resize(self):
         self.app.handle_event(pygame.event.Event(pygame.WINDOWFOCUSLOST))
@@ -80,7 +81,7 @@ class SaveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             store = SaveStore(Path(directory) / "subfolder" / "save.json")
             self.assertTrue(store.save(100, False, {"example": 1}))
-            self.assertEqual(store.load(), {"version": 1, "best": 100, "sound": False,
+            self.assertEqual(store.load(), {"version": 2, "best": 100, "sound": False,
                                            "round": {"example": 1}})
             self.assertFalse(store.path.with_suffix(".tmp").exists())
 

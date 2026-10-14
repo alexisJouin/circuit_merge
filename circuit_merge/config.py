@@ -13,15 +13,16 @@ LEFT, RIGHT, FLOOR = 316.0, 796.0, 790.0
 WALL_TOP, WALL_THICKNESS = 224.0, 6.0
 DROP_Y, DANGER_Y = 184.0, 272.0
 
-# La physique évolue à 120 Hz, indépendamment de l'affichage à 60 images/s.
-FIXED_DT = 1.0 / 120.0
+# Les petites pattes nécessitent un pas plus court : quatre pas par image à 60 Hz.
+FIXED_DT = 1.0 / 240.0
 RENDER_FPS = 60
 GRAVITY = 1080.0             # pixels / seconde²
 AIR_DAMPING = 0.985         # proportion de vitesse conservée après une seconde
 FRICTION = 0.72             # frottement des objets
-ELASTICITY = 0.38           # restitution d'un objet (valeurs multipliées au contact)
+ELASTICITY = 0.28           # restitution d'un objet (valeurs multipliées au contact)
 WALL_ELASTICITY = 0.45
-MAX_SPEED = 950.0           # limite contre la traversée de parois à grande vitesse
+MAX_SPEED = 800.0           # limite contre la traversée de parois à grande vitesse
+ROTATION_STEP = 15          # degrés par pression de E / flèche haute / molette
 DROP_INTERVAL = 0.38        # temps minimal entre deux lâchers
 DROP_GRACE = 1.15           # tolérance après création / fusion
 OVERFLOW_DELAY = 2.0        # durée continue au-dessus de la limite avant défaite
@@ -47,14 +48,15 @@ RED = (255, 112, 123)
 class ComponentSpec:
     """Description immuable d'un niveau ; aucun objet physique ici.
 
-    ``radius`` est le rayon de collision et d'affichage. ``points`` est le
+    ``size`` est une unité de conception : ce n'est PAS un rayon de collision.
+    Les dimensions et polygones sont définis dans ``geometry.py``. ``points`` est le
     nombre de points gagné en CREANT ce niveau. L'ordre est une progression
     ludique, pas un procédé réel d'assemblage électronique.
     """
 
     name: str
     short: str
-    radius: int
+    size: int
     color: tuple[int, int, int]
     points: int
     role: str
@@ -84,3 +86,7 @@ COMPONENTS = (
     ComponentSpec("Supercalculateur", "HPC", 132, (251, 200, 97), 66,
                   "Associe de nombreux nœuds de calcul pour traiter de grands problèmes."),
 )
+
+# Les vrais noms restent visibles ; ces surnoms servent aux personnages.
+NICKNAMES = ("Rési", "Luma", "Cappy", "Tris", "Logi", "Micro", "Ramona",
+             "Corey", "Pixie", "Maya", "Atlas")

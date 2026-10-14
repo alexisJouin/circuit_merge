@@ -51,7 +51,7 @@ class Application:
         self.persist = persist
         self.seed = seed
         pygame.display.init()
-        pygame.display.set_caption("Circuit Merge — Atelier informatique")
+        pygame.display.set_caption("Circuit Merge V2 — Les composants prennent vie")
         info = pygame.display.Info()
         scale = min(1.0, max(0.5, (info.current_w - 60) / C.WIDTH),
                     max(0.5, (info.current_h - 95) / C.HEIGHT))
@@ -72,7 +72,8 @@ class Application:
             try:
                 self.engine = GameEngine.from_snapshot(snapshot)
                 self.mode = "pause" if self.engine.state is RoundState.PLAYING else "game_over"
-                self.view.notify("Votre dernière partie a été restaurée.")
+                self.view.notify("Partie V1 convertie en V2 : reprise en pause." if self.store.migrated
+                                 else "Votre dernière partie a été restaurée.")
             except (KeyError, ValueError, TypeError, IndexError, OverflowError):
                 self.view.notify("Partie sauvegardée incompatible : nouveau départ.", 5)
         if self.store.error:
@@ -134,6 +135,9 @@ class Application:
         self.view.effects.clear()
         self.view.particles.clear()
         self.view.goal_time = 0
+        self.view.personalities.clear()
+        self.view.preview_face = self.view.preview_face.__class__(-1)
+        self.view._projection_key = None
         self.inspect_uid = None
         self.dragging = False
         self.save()
@@ -147,7 +151,7 @@ class Application:
         elif name == "debug":
             self.debug = not self.debug
             self.inspect_uid = None
-            self.view.notify("Mode NSI : cercles, vitesses, survol / clic droit" if self.debug else "Mode de jeu")
+            self.view.notify("Mode NSI : polygones, centres de masse, vitesses" if self.debug else "Mode de jeu")
         elif name == "help":
             self.mode = "help"
         elif name == "pause":
@@ -218,6 +222,8 @@ class Application:
             elif key == pygame.K_F11:
                 self.fullscreen = not self.fullscreen
                 self.screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN) if self.fullscreen else pygame.display.set_mode(self.windowed_size, pygame.RESIZABLE)
+            elif key in (pygame.K_e, pygame.K_UP, pygame.K_DOWN) and self.active:
+                self.engine.rotate_aim(-C.ROTATION_STEP if key == pygame.K_DOWN else C.ROTATION_STEP)
             elif key == pygame.K_r:
                 self.action("confirm_new" if self.engine.state is RoundState.GAME_OVER else "new")
             elif key in (pygame.K_RETURN, pygame.K_SPACE):
@@ -231,6 +237,8 @@ class Application:
                     self.engine.drop()
         # SDL produit parfois un événement souris supplémentaire pour le toucher.
         # On ignore ce doublon pour éviter de lâcher deux composants.
+        elif event.type == pygame.MOUSEWHEEL and self.active:
+            self.engine.rotate_aim(event.y * C.ROTATION_STEP)
         elif event.type == pygame.MOUSEBUTTONDOWN and not getattr(event, "touch", False):
             self._press(event.pos, event.button)
         elif event.type == pygame.MOUSEBUTTONUP and event.button == 1 and not getattr(event, "touch", False):
@@ -270,7 +278,7 @@ class Application:
                 self.accumulator -= C.FIXED_DT
                 if self.engine.state is RoundState.GAME_OVER:
                     break
-            self.view.animate(dt)
+            self.view.animate(dt * (0.25 if self.slow else 1.0), self.engine)
         else:
             self.accumulator = 0.0
             # Les messages d'information restent temporaires même dans un menu.

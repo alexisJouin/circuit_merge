@@ -13,6 +13,7 @@ import pymunk
 
 from . import config as C
 from .model import GameEvent, Piece, RoundState
+from .geometry import geometry_for
 
 PIECE_COLLISION, WALL_COLLISION = 1, 2
 
@@ -30,8 +31,8 @@ class GameEngine:
         self.space = pymunk.Space()
         self.space.gravity = (0, C.GRAVITY)
         self.space.damping = C.AIR_DAMPING
-        self.space.iterations = 30
-        self.space.collision_slop = 0.35
+        self.space.iterations = 40
+        self.space.collision_slop = 0.20
         self.space.sleep_time_threshold = 0.6
         self.space.idle_speed_threshold = 8.0
 
@@ -51,9 +52,11 @@ class GameEngine:
         self._last_merge = -math.inf
         self.last_drop = -C.DROP_INTERVAL
         self._last_impact = -math.inf
+        self._piece_impact: dict[int, float] = {}
         self.current_level = self._draw_level()
         self.next_level = self._draw_level()
         self.aim_x = (C.LEFT + C.RIGHT) / 2
+        self.aim_angle = 0.0
         self.state = RoundState.PLAYING
         self._create_walls()
 
@@ -82,9 +85,15 @@ class GameEngine:
         return self.rng.choices(range(len(C.DROP_WEIGHTS)), C.DROP_WEIGHTS, k=1)[0]
 
     def set_aim(self, x: float) -> None:
-        """Borne la visée en tenant compte du rayon et de la paroi."""
-        margin = C.COMPONENTS[self.current_level].radius + C.WALL_THICKNESS + 1
-        self.aim_x = max(C.LEFT + margin, min(C.RIGHT - margin, x))
+        """Borne la visée d'après la silhouette À SON ANGLE courant."""
+        left, _, right, _ = geometry_for(self.current_level).bounds(self.aim_angle)
+        margin = C.WALL_THICKNESS + 1
+        self.aim_x = max(C.LEFT + margin - left, min(C.RIGHT - margin - right, x))
+
+    def rotate_aim(self, degrees: float = C.ROTATION_STEP) -> None:
+        """Rotation avant le lâcher ; recalcule la place nécessaire aux bords."""
+        self.aim_angle = (self.aim_angle + math.radians(degrees) + math.pi) % math.tau - math.pi
+        self.set_aim(self.aim_x)
 
     @property
     def can_drop(self) -> bool:
@@ -102,12 +111,12 @@ class GameEngine:
             return False
         if x is not None:
             self.set_aim(x)
-        piece = self.add_piece(self.current_level, (self.aim_x, C.DROP_Y))
+        piece = self.add_piece(self.current_level, (self.aim_x, C.DROP_Y), angle=self.aim_angle)
         piece.body.velocity = (0, 12)
-        self.events.append(GameEvent("drop", self.aim_x, C.DROP_Y, self.current_level))
+        self.events.append(GameEvent("drop", self.aim_x, C.DROP_Y, self.current_level, uid=piece.uid))
         self.current_level = self.next_level
         self.next_level = self._draw_level()
-        self.set_aim(self.aim_x)  # le nouveau rayon peut être plus grand
+        self.set_aim(self.aim_x)  # le nouveau composant peut être plus large
         self.last_drop = self.time
         self.drops += 1
         return True
@@ -115,30 +124,37 @@ class GameEngine:
     def add_piece(self, level: int, position: tuple[float, float],
                   velocity: tuple[float, float] = (0.0, 0.0),
                   *, angle: float = 0.0, born_at: float | None = None) -> Piece:
-        """Crée un disque rigide : utile aux fusions, sauvegardes et expériences.
+        """Crée un corps rigide composé de polygones : fusions, sauvegardes, TP.
 
-        La masse est proportionnelle à l'aire ; Pymunk calcule le moment
-        d'inertie. Cette méthode ne compte pas un lâcher et n'ajoute pas de score.
+        Les sommets sont déjà centrés sur le centre de masse. Le moment
+        d'inertie total est la somme des moments de chaque partie autour de
+        CETTE origine commune. On fixe la masse du corps explicitement ; ne
+        pas ajouter de densité Pymunk aux formes (deux modes de calcul distincts).
+        Cette méthode ne borne pas la position : elle sert aussi aux expériences.
         """
         if not 0 <= level < len(C.COMPONENTS):
             raise ValueError("Niveau de composant invalide")
-        radius = C.COMPONENTS[level].radius
-        mass = (radius / C.COMPONENTS[0].radius) ** 2
-        body = pymunk.Body(mass, pymunk.moment_for_circle(mass, 0, radius))
+        geometry = geometry_for(level)
+        moment = sum(pymunk.moment_for_poly(p.mass, p.vertices) for p in geometry.parts)
+        body = pymunk.Body(geometry.mass, moment)
         body.position = position
         body.velocity = velocity
         body.angle = angle
         body.velocity_func = self._limit_velocity
-        shape = pymunk.Circle(body, radius)
-        shape.friction = C.FRICTION
-        shape.elasticity = C.ELASTICITY
-        shape.collision_type = PIECE_COLLISION
         self._next_uid += 1
-        piece = Piece(self._next_uid, level, body, shape,
+        shapes = tuple(pymunk.Poly(body, part.vertices) for part in geometry.parts)
+        for shape in shapes:
+            shape.friction = C.FRICTION
+            shape.elasticity = C.ELASTICITY
+            shape.collision_type = PIECE_COLLISION
+            # Les parties d'un même composant ne se heurtent pas entre elles.
+            shape.filter = pymunk.ShapeFilter(group=self._next_uid)
+        piece = Piece(self._next_uid, level, body, shapes,
                       self.time if born_at is None else born_at)
         self.pieces[piece.uid] = piece
-        self._by_shape[shape] = piece
-        self.space.add(body, shape)
+        for shape in shapes:
+            self._by_shape[shape] = piece
+        self.space.add(body, *shapes)
         self.highest_level = max(self.highest_level, level)
         return piece
 
@@ -161,7 +177,7 @@ class GameEngine:
         La file contient des identifiants copiés, jamais des arbitres conservés.
         """
         a, b = (self._by_shape.get(shape) for shape in arbiter.shapes)
-        if a is None or b is None or a.level != b.level:
+        if a is None or b is None or a.uid == b.uid or a.level != b.level:
             return
         if min(self.time - a.born_at, self.time - b.born_at) < C.MERGE_GRACE:
             return
@@ -169,17 +185,42 @@ class GameEngine:
 
     def _on_impact(self, arbiter: pymunk.Arbiter,
                    _space: pymunk.Space, _data: Any) -> None:
-        """Émet peu d'événements : pas de bruit continu sur une pile immobile."""
-        if (arbiter.is_first_contact and arbiter.total_ke > 90
-                and self.time - self._last_impact > 0.09):
-            self.events.append(GameEvent("impact"))
-            self._last_impact = self.time
+        """Réactions par pièce, avec délai anti-doublon pour les multi-contacts.
+
+        Une même collision peut toucher plusieurs pattes : on ne répète ni la
+        grimace ni le son à chaque polygone. La pile au repos ne grimace pas.
+        """
+        if not arbiter.is_first_contact:
+            return
+        for shape in arbiter.shapes:
+            piece = self._by_shape.get(shape)
+            if piece is None:
+                continue
+            shock = arbiter.total_impulse.length / piece.body.mass
+            if shock > 75 and self.time - self._piece_impact.get(piece.uid, -math.inf) > 0.20:
+                self._piece_impact[piece.uid] = self.time
+                x, y = piece.body.position
+                self.events.append(GameEvent("ouch", x, y, piece.level, uid=piece.uid, strength=shock))
+                if self.time - self._last_impact > 0.09:
+                    self.events.append(GameEvent("impact"))
+                    self._last_impact = self.time
 
     def _remove_piece(self, piece: Piece) -> None:
         """Maintient les deux index cohérents avec l'espace physique."""
-        self.space.remove(piece.shape, piece.body)
+        self.space.remove(*piece.shapes, piece.body)
         del self.pieces[piece.uid]
-        del self._by_shape[piece.shape]
+        for shape in piece.shapes:
+            del self._by_shape[shape]
+        self._piece_impact.pop(piece.uid, None)
+
+    @staticmethod
+    def _fit_position(level: int, position, angle: float) -> tuple[float, float]:
+        """Replace une silhouette tournée dans le bac sans pénétrer les parois."""
+        left, _top, right, bottom = geometry_for(level).bounds(angle)
+        margin = C.WALL_THICKNESS + 0.5
+        x = max(C.LEFT + margin - left, min(C.RIGHT - margin - right, position[0]))
+        y = min(C.FLOOR - margin - bottom, position[1])
+        return x, y
 
     def _process_merges(self) -> None:
         """Résout chaque paire ; une pièce ne peut être consommée deux fois.
@@ -197,7 +238,9 @@ class GameEngine:
             total_mass = a.body.mass + b.body.mass
             position = (a.body.position * a.body.mass + b.body.position * b.body.mass) / total_mass
             velocity = (a.body.velocity * a.body.mass + b.body.velocity * b.body.mass) / total_mass
-            angle = (a.body.angle + b.body.angle) / 2
+            # Moyenne circulaire : +179° et -179° donnent 180°, pas 0°.
+            angle = math.atan2(math.sin(a.body.angle) + math.sin(b.body.angle),
+                               math.cos(a.body.angle) + math.cos(b.body.angle))
             level = a.level + 1
             self._remove_piece(a)
             self._remove_piece(b)
@@ -205,25 +248,26 @@ class GameEngine:
             if level < len(C.COMPONENTS):
                 # Évite une création DANS le sol ou une paroi. Les contacts
                 # avec les voisins seront résolus naturellement par Pymunk.
-                radius = C.COMPONENTS[level].radius + C.WALL_THICKNESS + 0.5
-                x = max(C.LEFT + radius, min(C.RIGHT - radius, position.x))
-                y = min(C.FLOOR - radius, position.y)
-                self.add_piece(level, (x, y), (velocity.x, velocity.y), angle=angle)
+                x, y = self._fit_position(level, position, angle)
+                created = self.add_piece(level, (x, y), (velocity.x, velocity.y), angle=angle)
+                uid = created.uid
                 points = C.COMPONENTS[level].points
             else:
                 # Deux objets terminaux disparaissent : la partie reste infinie.
                 self.completed_circuits += 1
                 points = 2 * C.COMPONENTS[-1].points
                 level = len(C.COMPONENTS) - 1
+                uid = None
 
             self.score += points
             self.merge_count += 1
             self.combo = self.combo + 1 if self.time - self._last_merge <= C.COMBO_WINDOW else 1
             self._last_merge = self.time
             self.events.append(GameEvent("merge", position.x, position.y,
-                                         level, points, self.combo))
+                                         level, points, self.combo, uid=uid))
             if level == len(C.COMPONENTS) - 1:
-                self.events.append(GameEvent("goal", position.x, position.y, level))
+                self.events.append(GameEvent("goal" if uid is not None else "circuit",
+                                             position.x, position.y, level))
 
     def step(self, dt: float = C.FIXED_DT) -> None:
         """Avance UN pas fixe ; la boucle graphique gère l'accumulateur.
@@ -246,12 +290,12 @@ class GameEngine:
         de perdre à cause du composant qui vient juste d'être lâché / fusionné.
         """
         for piece in self.pieces.values():
-            above = piece.body.position.y - piece.radius < C.DANGER_Y
+            bb = piece.bounds
+            # BB.bottom est min(y), donc le HAUT à l'écran (y vers le bas).
+            above = bb.bottom < C.DANGER_Y
             old_enough = self.time - piece.born_at >= C.DROP_GRACE
             piece.overflow_time = piece.overflow_time + dt if above and old_enough else 0.0
-            escaped = (piece.body.position.y > C.FLOOR + piece.radius + 100
-                       or piece.body.position.x < C.LEFT - piece.radius
-                       or piece.body.position.x > C.RIGHT + piece.radius)
+            escaped = (bb.bottom > C.FLOOR + 100 or bb.right < C.LEFT or bb.left > C.RIGHT)
             if piece.overflow_time >= C.OVERFLOW_DELAY or (escaped and old_enough):
                 self.state = RoundState.GAME_OVER
                 self.events.append(GameEvent("game_over"))
@@ -276,7 +320,7 @@ class GameEngine:
     def piece_at(self, x: float, y: float) -> Piece | None:
         """Recherche géométrique pour l'inspecteur pédagogique."""
         for piece in reversed(list(self.pieces.values())):
-            if (piece.body.position - (x, y)).length <= piece.radius:
+            if any(shape.point_query((x, y)).distance <= 0 for shape in piece.shapes):
                 return piece
         return None
 
@@ -287,12 +331,12 @@ class GameEngine:
         Le résultat est une reprise de partie, pas un rejeu bit à bit.
         """
         return {
-            "version": 1, "time": self.time, "score": self.score,
+            "version": 2, "time": self.time, "score": self.score,
             "drops": self.drops, "merge_count": self.merge_count,
             "highest_level": self.highest_level,
             "completed_circuits": self.completed_circuits,
             "current_level": self.current_level, "next_level": self.next_level,
-            "aim_x": self.aim_x, "last_drop": self.last_drop,
+            "aim_x": self.aim_x, "aim_angle": self.aim_angle, "last_drop": self.last_drop,
             "state": self.state.name, "rng_state": self.rng.getstate(),
             "pieces": [
                 {"level": p.level, "position": list(p.body.position),
@@ -306,7 +350,7 @@ class GameEngine:
     @classmethod
     def from_snapshot(cls, data: dict[str, Any]) -> "GameEngine":
         """Reconstruit une partie ; refuse un état incomplet ou non raisonnable."""
-        if data.get("version") != 1 or len(data["pieces"]) > 1500:
+        if data.get("version") not in (1, 2) or len(data["pieces"]) > 1500:
             raise ValueError("Format de sauvegarde non pris en charge")
 
         def number(value: Any, low: float, high: float) -> float:
@@ -329,6 +373,7 @@ class GameEngine:
         engine.current_level = integer(data["current_level"], 0, len(C.DROP_WEIGHTS) - 1)
         engine.next_level = integer(data["next_level"], 0, len(C.DROP_WEIGHTS) - 1)
         engine.last_drop = number(data["last_drop"], -C.DROP_INTERVAL, engine.time)
+        engine.aim_angle = number(data.get("aim_angle", 0), -math.pi, math.pi)
         engine.set_aim(number(data["aim_x"], 0, C.WIDTH))
         engine.state = RoundState[data["state"]]
 
@@ -340,13 +385,23 @@ class GameEngine:
         for item in data["pieces"]:
             level = integer(item["level"], 0, len(C.COMPONENTS) - 1)
             position = tuple(number(v, -500, 2000) for v in item["position"])
-            velocity = tuple(number(v, -C.MAX_SPEED, C.MAX_SPEED) for v in item["velocity"])
+            # La V1 autorisait 950 px/s ; conserver puis plafonner au prochain pas.
+            velocity = tuple(number(v, -950, 950) for v in item["velocity"])
             if len(position) != 2 or len(velocity) != 2:
                 raise ValueError("Vecteur de taille incorrecte")
+            angle = number(item["angle"], -1e9, 1e9)
+            legacy = data["version"] == 1
+            if legacy:
+                position = engine._fit_position(level, position, angle)
             piece = engine.add_piece(level, position, velocity,
-                                     angle=number(item["angle"], -1e9, 1e9),
+                                     angle=angle,
                                      born_at=engine.time - number(item["age"], 0, engine.time + 10))
             piece.body.angular_velocity = number(item["angular_velocity"], -12, 12)
             piece.overflow_time = number(item["overflow_time"], 0, C.OVERFLOW_DELAY + 1)
+            if legacy:
+                # La conversion des disques peut réarranger la pile. Une grâce
+                # neuve permet de laisser les nouvelles silhouettes se stabiliser.
+                piece.born_at = engine.time
+                piece.overflow_time = 0.0
         engine.events.clear()
         return engine

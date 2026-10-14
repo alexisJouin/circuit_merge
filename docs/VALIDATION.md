@@ -1,41 +1,23 @@
-# Validation — version 1.0.0
+# Validation V2 — 11 octobre 2026
 
-Vérifications exécutées le **6 octobre 2026**.
+Copie de travail récupérée, puis vérifiée sous Linux / Python 3.12.14,
+pygame-ce 2.5.8 et Pymunk 7.3.0. Pilotes SDL simulés.
 
-## Environnement testé
+- 38 tests automatisés réussis en 26 secondes.
+- Contacts égaux / différents, chaînes, paire terminale et absence de double fusion.
+- Sol, 11 niveaux à trois orientations, stress de plusieurs parties.
+- Masse centrée, rotation de RAM, espaces entre pattes et baies laissés vides.
+- Bornes de visée et débordement selon l'orientation ; projection SAT.
+- Clignements, réactions prioritaires, choc réel et indépendance du hasard.
+- Pause, clavier, molette, souris, redimensionnement et sauvegarde.
+- Import V1 sans modifier le fichier d'origine ; format V2 restauré.
+- Aperçu généré avec le vrai rendu et inspecté visuellement.
 
-- Python 3.12.14, Linux x86-64.
-- Pygame 2.6.1, Pymunk 7.3.0.
-- SDL en mode sans écran pour les scénarios automatisés et les captures.
+Les tests ne garantissent pas tous les empilements. Les silhouettes sont des
+approximations 2D rigides. Le son matériel, le toucher et le plein écran sur
+moniteur réel ne sont pas validés. Les scripts Windows sont conservés et relus,
+mais cette copie n'a pas été exécutée sur Windows. L'ancien compte rendu V1
+reste dans historique et ne constitue pas une validation de la V2.
 
-## Résultats
-
-- **20 tests automatisés réussis** avec `python -m unittest discover -s tests -v`.
-- Test de lancement sur 120 images réussi avec `--smoke-test 120 --mute`.
-- Compilation syntaxique des modules, expériences et exercices réussie.
-- Capture du montage de démonstration générée avec le vrai rendu Pygame.
-- Inspection visuelle de l'interface, des textes, du bac et des composants.
-- Expérience de chute libre exécutée à 30, 60, 120 et 240 Hz : les écarts de
-  position après une seconde valent 18, 9, 4,5 et 2,25 pixels pour le modèle testé.
-
-## Comportements couverts
-
-Contact égal / inégal, trois contacts simultanés, fusion en chaîne, paire
-terminale, prochaine pièce, délai de lâcher, bornes de visée, arrêt au sol,
-stabilité de plusieurs parties pseudoaléatoires, tolérance de création,
-dépassement continu, chronomètres séparés, fin de partie, sauvegarde JSON,
-tirages restaurés, rejet de NaN, pause, clic / relâcher, clic sur un menu,
-clavier, mode NSI, ralenti, perte de focus et redimensionnement.
-
-## Portée
-
-Les essais de simulation et de rendu ont été effectués sous Linux. Les
-scripts Windows et les instructions macOS sont fournis mais n'ont pas été
-exécutés sur ces systèmes. Le son a été initialisé avec le pilote SDL simulé,
-sans écoute sur un périphérique réel. Le plein écran et le toucher matériel
-n'ont pas été vérifiés sur un appareil physique.
-
-Les contacts au chargement sont recalculés : un état sauvegardé ne garantit
-pas une reprise identique bit à bit. Les tests de charge ne couvrent pas tous
-les empilements possibles. Les paramètres sont ceux de Circuit Merge ; ils
-n'ont pas été extraits du jeu Android.
+Lancement sans écran sur 120 images réussi (code retour 0). Compilation
+syntaxique réussie ; expérience occupation.py exécutée.
