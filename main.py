@@ -13,6 +13,7 @@ import sys
 def main() -> None:
     """Lit les options, explique une dépendance manquante, puis lance le jeu."""
     parser = argparse.ArgumentParser(description="Circuit Merge — Jeu de fusion électronique")
+    parser.add_argument("--classic", action="store_true", help="ouvrir directement l’atelier V2")
     parser.add_argument("--seed", type=int, help="graine du générateur pour les expériences NSI")
     parser.add_argument("--fresh", action="store_true", help="ignorer la partie interrompue")
     parser.add_argument("--mute", action="store_true", help="démarrer sans son")
@@ -35,6 +36,10 @@ def main() -> None:
             print("Puis : python main.py")
             raise SystemExit(1) from None
         raise
+    if not args.classic and not args.demo:
+        from circuit_merge.project_app import launch_project
+        launch_project(save_path=args.save_file, muted=args.mute, screenshot=args.screenshot, smoke_test=args.smoke_test)
+        return
     launch(seed=args.seed, fresh=args.fresh, muted=args.mute, demo=args.demo,
            save_path=args.save_file, screenshot=args.screenshot, smoke_test=args.smoke_test)
 

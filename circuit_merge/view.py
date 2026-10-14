@@ -196,7 +196,7 @@ class View:
         draw_component(self.canvas, 5, (48, 48), 39)
         self.text("CIRCUIT", (78, 26), 36)
         self.text("MERGE", (200, 26), 36, C.TEAL)
-        self.text("V2 · Des composants qui prennent vie.", (79, 66), 20, C.MUTED)
+        self.text(getattr(self, "subtitle", "V2 · Des composants qui prennent vie."), (79, 66), 20, C.MUTED)
         self.button("sound", "Muet" if muted else "Son", (846, 28, 72, 40), mouse)
         self.button("pause", "Pause", (928, 28, 91, 40), mouse)
         self.button("help", "?", (1029, 28, 58, 40), mouse)

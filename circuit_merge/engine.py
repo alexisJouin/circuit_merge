@@ -26,7 +26,8 @@ class GameEngine:
     sur y. Le compteur ``time`` avance seulement quand ``step`` est appelée.
     """
 
-    def __init__(self, seed: int | None = None) -> None:
+    def __init__(self, seed: int | None = None, *, arena=None) -> None:
+        self.left, self.right, self.floor = arena or (C.LEFT, C.RIGHT, C.FLOOR)
         self.rng = random.Random(seed)
         self.space = pymunk.Space()
         self.space.gravity = (0, C.GRAVITY)
@@ -55,7 +56,7 @@ class GameEngine:
         self._piece_impact: dict[int, float] = {}
         self.current_level = self._draw_level()
         self.next_level = self._draw_level()
-        self.aim_x = (C.LEFT + C.RIGHT) / 2
+        self.aim_x = (self.left + self.right) / 2
         self.aim_angle = 0.0
         self.state = RoundState.PLAYING
         self._create_walls()
@@ -70,9 +71,9 @@ class GameEngine:
 
     def _create_walls(self) -> None:
         """Trois segments statiques forment un bac ouvert en haut."""
-        ends = (((C.LEFT, C.WALL_TOP), (C.LEFT, C.FLOOR)),
-                ((C.RIGHT, C.WALL_TOP), (C.RIGHT, C.FLOOR)),
-                ((C.LEFT, C.FLOOR), (C.RIGHT, C.FLOOR)))
+        ends = (((self.left, C.WALL_TOP), (self.left, self.floor)),
+                ((self.right, C.WALL_TOP), (self.right, self.floor)),
+                ((self.left, self.floor), (self.right, self.floor)))
         for a, b in ends:
             wall = pymunk.Segment(self.space.static_body, a, b, C.WALL_THICKNESS)
             wall.friction = C.FRICTION
@@ -88,7 +89,7 @@ class GameEngine:
         """Borne la visée d'après la silhouette À SON ANGLE courant."""
         left, _, right, _ = geometry_for(self.current_level).bounds(self.aim_angle)
         margin = C.WALL_THICKNESS + 1
-        self.aim_x = max(C.LEFT + margin - left, min(C.RIGHT - margin - right, x))
+        self.aim_x = max(self.left + margin - left, min(self.right - margin - right, x))
 
     def rotate_aim(self, degrees: float = C.ROTATION_STEP) -> None:
         """Rotation avant le lâcher ; recalcule la place nécessaire aux bords."""
@@ -213,13 +214,12 @@ class GameEngine:
             del self._by_shape[shape]
         self._piece_impact.pop(piece.uid, None)
 
-    @staticmethod
-    def _fit_position(level: int, position, angle: float) -> tuple[float, float]:
+    def _fit_position(self, level: int, position, angle: float) -> tuple[float, float]:
         """Replace une silhouette tournée dans le bac sans pénétrer les parois."""
         left, _top, right, bottom = geometry_for(level).bounds(angle)
         margin = C.WALL_THICKNESS + 0.5
-        x = max(C.LEFT + margin - left, min(C.RIGHT - margin - right, position[0]))
-        y = min(C.FLOOR - margin - bottom, position[1])
+        x = max(self.left + margin - left, min(self.right - margin - right, position[0]))
+        y = min(self.floor - margin - bottom, position[1])
         return x, y
 
     def _process_merges(self) -> None:
@@ -295,7 +295,7 @@ class GameEngine:
             above = bb.bottom < C.DANGER_Y
             old_enough = self.time - piece.born_at >= C.DROP_GRACE
             piece.overflow_time = piece.overflow_time + dt if above and old_enough else 0.0
-            escaped = (bb.bottom > C.FLOOR + 100 or bb.right < C.LEFT or bb.left > C.RIGHT)
+            escaped = (bb.bottom > self.floor + 100 or bb.right < self.left or bb.left > self.right)
             if piece.overflow_time >= C.OVERFLOW_DELAY or (escaped and old_enough):
                 self.state = RoundState.GAME_OVER
                 self.events.append(GameEvent("game_over"))
