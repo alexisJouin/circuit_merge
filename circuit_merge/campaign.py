@@ -27,7 +27,7 @@ class Mission:
     stock: tuple = ()  # niveau, x, y, angle, marque
     score_goal: int = 0
 
-MISSIONS = (
+LEGACY_MISSIONS = (
     Mission('Premier courant','Luma attend ses premières lampes. Assemblons trois LED.',
             'Créer 3 LED','create',3,level=1,budget=12,par=6,sequence=(0,)*12),
     Mission('Des établis, enfin','Les premières livraisons arrivent par paires. Fais monter le score.',
@@ -56,6 +56,38 @@ MISSIONS = (
             'Créer 1 RAM ET 70 points','create',1,level=6,score_goal=70,budget=20,par=4,
             sequence=(4,4,4,4,3,3,2,2)*3),
 )
+# V3.1 : aucune livraison de puce, microcontrôleur ou RAM.
+MISSIONS = (
+    Mission('Premier courant','Une série complète de lampes pour éclairer le chantier.',
+            'Créer 12 LED','create',12,budget=32,par=26,sequence=(0,)*12),
+    Mission('Des établis, enfin','Construis une chaîne de production, à partir des petites pièces.',
+            '160 points ET 25 fusions','merge',25,score_goal=160,budget=52,par=35,
+            sequence=(0,0,1,0,0,1)),
+    Mission('Réserve d’énergie','Le fond est encombré. Fabrique toute une réserve de condensateurs.',
+            'Créer 10 condensateurs','create',10,level=2,budget=56,par=32,
+            sequence=(0,1,0,0,1,0),stock=((0,395,765,.2,False),(1,710,750,.3,False))),
+    Mission('Couloir de câbles','Un atelier étroit et des livraisons décalées : organise tes piles.',
+            'Réussir 38 fusions','merge',38,budget=60,par=48,width=400,
+            sequence=(0,1,0,1,0,0,1,0)),
+    Mission('Logique de chantier','Trois puces de contrôle à fabriquer, aucune livrée toute faite.',
+            'Créer 3 puces logiques','create',3,level=4,budget=58,par=42,floor=735,
+            sequence=(0,1,0,1,0,0,1,1)),
+    Mission('Pièces prioritaires','Recycle les deux condensateurs cerclés puis termine la production.',
+            '2 pièces marquées ET 220 points','marked',2,score_goal=220,budget=62,par=57,
+            sequence=(0,0,1,0,1,0),stock=((2,430,740,0,True),(2,680,740,0,True))),
+    Mission('Test de puissance','Fais fonctionner la chaîne sur la durée malgré le stock initial.',
+            '420 points ET 40 fusions','merge',40,score_goal=420,budget=76,par=71,width=420,
+            sequence=(0,1,0,1,2,0,1,0),stock=((0,395,760,0,False),(1,710,750,.1,False))),
+    Mission('Le chef d’orchestre','Deux microcontrôleurs, entièrement assemblés dans ton atelier.',
+            'Créer 2 microcontrôleurs','create',2,level=5,budget=80,par=50,
+            sequence=(0,1,0,1,1,0,2,0)),
+    Mission('Contrôle qualité','Une production régulière, dans la zone la plus serrée.',
+            '55 fusions ET 500 points','merge',55,score_goal=500,budget=88,par=76,width=380,
+            sequence=(0,1,0,2,0,1,0,1)),
+    Mission('Laboratoire opérationnel','Fabrique les deux mémoires du centre de contrôle.',
+            'Créer 2 RAM ET 850 points','create',2,level=6,score_goal=850,budget=110,par=102,
+            sequence=(0,1,0,2,1,0,2,1)),
+)
 BUILDINGS = (
     ('Sol technique',150,2,'Le hangar devient un laboratoire.'),
     ('Énergie sécurisée',230,4,'Alimentation, câbles et éclairage.'),
@@ -67,8 +99,9 @@ TOOLS={'remove':('Pince',80,35,2),'swap':('Échange',60,25,3),'extra':('Livraiso
 
 class MissionEngine(GameEngine):
     """Objectifs comptés sur les contacts réels ; 8 secondes après le dernier lâcher."""
-    def __init__(self,index):
-        self.index=index; self.mission=m=MISSIONS[index]
+    def __init__(self,index,*,ruleset=2):
+        self.ruleset=ruleset
+        self.index=index; self.mission=m=(MISSIONS if ruleset==2 else LEGACY_MISSIONS)[index]
         self.created=Counter(); self.marked=set(); self.marked_done=0
         self.extra=0; self.swaps=0; self.used=set(); self.outcome=None
         self.attempt_id=uuid.uuid4().hex; self.settle_until=None; self.initializing=True
@@ -135,12 +168,12 @@ class MissionEngine(GameEngine):
         self.used.add(kind); return True
     def campaign_snapshot(self):
         marks=[i for i,p in enumerate(self.pieces.values()) if p.uid in self.marked]
-        return dict(index=self.index,engine=self.snapshot(),created=dict(self.created),marked=marks,
+        return dict(index=self.index,ruleset=self.ruleset,engine=self.snapshot(),created=dict(self.created),marked=marks,
                     marked_done=self.marked_done,extra=self.extra,swaps=self.swaps,used=sorted(self.used),
                     attempt_id=self.attempt_id,settle_until=self.settle_until,outcome=self.outcome)
     @classmethod
     def restore(cls,data):
-        engine=cls(checked_int(data['index'],0,9)); old=GameEngine.from_snapshot(data['engine'])
+        engine=cls(checked_int(data['index'],0,9),ruleset=checked_int(data.get('ruleset',1),1,2)); old=GameEngine.from_snapshot(data['engine'])
         for p in list(engine.pieces.values()): engine._remove_piece(p)
         for key in ('time','score','drops','merge_count','highest_level','completed_circuits',
                     'last_drop','aim_angle','state','combo','_last_merge'):
@@ -183,12 +216,13 @@ class Profile:
     free_round: dict|None=None
     best: int=0
     sound: bool=True
+    pc_build: dict|None=None
     @property
     def completed(self): return sum(s>0 for s in self.stars)
     def available(self,index): return 0<=index<10 and (index==0 or self.stars[index-1]>0)
     def award(self,engine):
         if engine.outcome!='won' or engine.attempt_id in self.receipts: return 0
-        i=engine.index; par=MISSIONS[i].par
+        i=engine.index; par=engine.mission.par
         stars=3 if engine.drops<=par else (2 if engine.drops<=par+3 else 1)
         reward=(170+15*i+min(50,engine.score//5)) if not self.stars[i] else (25+min(15,engine.score//10))
         self.credits+=reward; self.stars[i]=max(self.stars[i],stars)
@@ -230,6 +264,9 @@ class CampaignStore:
             if type(p.sound) is not bool: raise ValueError('Son invalide')
             if not isinstance(p.receipts,list) or any(not isinstance(s,str) for s in p.receipts): raise ValueError('Transactions invalides')
             if p.active and not p.available(MissionEngine.restore(p.active).index): raise ValueError('Mission verrouillée')
+            if p.pc_build is not None:
+                from .pc_builder import PCBuild
+                PCBuild.restore(p.pc_build)
             if p.free_round: GameEngine.from_snapshot(p.free_round)
             return p
         except FileNotFoundError: return Profile()

@@ -1,3 +1,6 @@
+> Guide historique V3. Pour les objectifs actuels, voir EQUILIBRAGE_V31.md.
+> Le nouveau mode est décrit dans INTRO_ARCHITECTURE.md.
+
 # Projet Q — conception et atelier NSI
 
 Le chapitre Fondations installe l'infrastructure classique d'un futur

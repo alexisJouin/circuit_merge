@@ -8,7 +8,10 @@ os.environ.setdefault('SDL_VIDEODRIVER','dummy')
 os.environ.setdefault('SDL_AUDIODRIVER','dummy')
 os.environ.setdefault('PYGAME_HIDE_SUPPORT_PROMPT','1')
 import pygame
-from circuit_merge.campaign import MissionEngine,Profile,CampaignStore,MISSIONS,BUILDINGS
+from circuit_merge.campaign import MissionEngine as NewMissionEngine,Profile,CampaignStore,LEGACY_MISSIONS as MISSIONS,BUILDINGS
+
+def MissionEngine(index): return NewMissionEngine(index,ruleset=1)
+MissionEngine.restore=NewMissionEngine.restore
 from circuit_merge.project_app import ProjectApplication
 from circuit_merge.engine import GameEngine
 

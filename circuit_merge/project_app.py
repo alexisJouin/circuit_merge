@@ -7,17 +7,21 @@ from .app import Application
 from .engine import GameEngine
 from .campaign import Profile,CampaignStore,MissionEngine,BUILDINGS
 from .world_view import WorldView
+from .pc_builder import PCBuild, PARTS
+from .pc_view import render_pc, ZONES
 
 class ProjectApplication(Application):
     def __init__(self,*,save_path=None,persist=True,muted=False):
         self.ready=False; self.page='hub'; self.selected=0; self.reward=0
         self.project_persist=persist; self.campaign_store=CampaignStore(save_path)
         self.profile=self.campaign_store.load() if persist else Profile()
+        self.pc=PCBuild.restore(self.profile.pc_build) if self.profile.pc_build else PCBuild()
+        self.pc_selected=None; self.pc_guide=True; self.pc_confirm=False
         super().__init__(persist=False,muted=muted,save_path=Path.cwd()/'unused_v2.json')
         self.view=WorldView(); self.audio.enabled=self.profile.sound and not muted
         self.profile.sound=self.audio.enabled
         self.ready=True; self.engine=GameEngine(3); self.mode=None; self.best=self.profile.best
-        pygame.display.set_caption('Circuit Merge V3 — Projet Q / Chapitre 1')
+        pygame.display.set_caption('Circuit Merge V3.1 — Projet Q / Chapitre 1')
         if self.campaign_store.error: self.view.notify(self.campaign_store.error,8)
         self.draw()
     @property
@@ -29,6 +33,7 @@ class ProjectApplication(Application):
             if isinstance(self.engine,MissionEngine):
                 if not self.engine.outcome: self.profile.active=self.engine.campaign_snapshot()
             else: self.profile.free_round=self.engine.snapshot()
+        self.profile.pc_build=self.pc.snapshot()
         self.profile.best=max(self.profile.best,self.best); self.profile.sound=self.audio.enabled
         if self.project_persist and not self.campaign_store.save(self.profile): self.view.notify(self.campaign_store.error,8)
         self.last_autosave=time.monotonic()
@@ -43,7 +48,24 @@ class ProjectApplication(Application):
         self.page='play'; self.mode=None; self.profile.active=self.engine.campaign_snapshot(); self.save()
     def action(self,name):
         if not self.ready: return
-        if name=='hub':
+        if name=='pc':
+            self.save(); self.page='pc'; self.mode=None; self.pc_confirm=False
+        elif name.startswith('pc:'):
+            action=name[3:]
+            if action.startswith('select:'):
+                self.pc_selected=action.split(':')[1]
+            elif action=='guide': self.pc_guide=not self.pc_guide
+            elif action=='reset': self.pc_confirm=True
+            elif action=='cancel': self.pc_confirm=False
+            elif action=='confirm':
+                self.pc=PCBuild(); self.pc_selected=None; self.pc_confirm=False; self.save()
+            elif action=='remove':
+                ok,msg=self.pc.remove(self.pc_selected)
+                self.view.notify(msg,6)
+                if ok: self.save()
+            elif action=='boot':
+                ok,msg=self.pc.boot(); self.view.notify(msg,9); self.save()
+        elif name=='hub':
             self.save(); self.page='hub'; self.mode=None; self.view.tool=None; self.dragging=False
         elif name.startswith('mission:'):
             i=int(name.split(':')[1])
@@ -94,7 +116,17 @@ class ProjectApplication(Application):
         self.mouse=self.logical_position(pos)
         for name,rect in self.view.buttons.items():
             if button==1 and rect.collidepoint(self.mouse): self.action(name); self.draw(); return
-        if self.active and self.view.tool=='remove' and button==1:
+        if self.page=='pc' and button==1 and not self.pc_confirm:
+            if self.pc_selected:
+                if pygame.Rect(ZONES[self.pc_selected]).collidepoint(self.mouse):
+                    ok,msg=self.pc.install(self.pc_selected)
+                    self.view.notify(msg,6)
+                    if ok: self.save()
+                else:
+                    self.view.notify('Emplacement attendu : '+PARTS[self.pc_selected].destination+'.',5)
+            else: self.view.notify('Choisis une pièce dans la liste à gauche.',4)
+            return
+        if self.active and self.view.tool=='remove'  and button==1:
             p=self.engine.piece_at(*self.mouse)
             if p and self.profile.use(self.engine,'remove',p.uid):
                 self.view.tool=None; self.view._q_projection_key=None
@@ -126,7 +158,8 @@ class ProjectApplication(Application):
     def draw(self):
         if not self.ready: return super().draw()
         p=self.profile
-        if self.page=='hub': canvas=self.view.render_hub(p,self.mouse,p.active)
+        if self.page=='pc': canvas=render_pc(self.view,self.pc,self.pc_selected,self.mouse,self.pc_guide,self.pc_confirm)
+        elif self.page=='hub': canvas=self.view.render_hub(p,self.mouse,p.active)
         elif self.page=='shop': canvas=self.view.render_shop(p,self.mouse)
         elif self.page=='briefing': canvas=self.view.render_briefing(p,self.selected,self.mouse)
         elif self.page=='result': canvas=self.view.render_result(p,self.engine,self.reward,self.mouse)

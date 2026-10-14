@@ -1,11 +1,66 @@
-# Circuit Merge V3 — Projet Q
+# Circuit Merge V3.1 — Projet Q + Montage PC
 
 Construis le laboratoire qui accueillera ton ordinateur quantique !
 Cette version livre **le chapitre 1 : Fondations**, avec dix missions,
 cinq constructions visibles et trois bonus facultatifs. Les chapitres
 suivants et la finalisation de l'ordinateur ne sont pas encore jouables.
 
-![Le chantier](docs/chantier_v3.png)
+![Le chantier](docs/chantier_v31.png)
+
+
+## Nouveautés V3.1
+
+- Dix missions rééquilibrées : de 24 à 100 lâchers dans les solutions de test,
+  au lieu de 1 à 11 pour plusieurs anciennes missions. Ce sont des essais,
+  pas des minimums garantis ni une durée imposée.
+- Aucune puce, aucun microcontrôleur et aucune RAM livrés tout faits.
+  Les six premières missions livrent seulement résistances et LED ; les
+  suivantes ajoutent quelques condensateurs.
+- Objectifs de production en série, budgets et seuils d'étoiles revus.
+- **Mode libre Montage PC**, accessible dès le départ, sans crédits ni chrono.
+
+## Montage PC — introduction à l'architecture matérielle
+
+Depuis le chantier, clique **Mode libre : Montage PC**.
+Choisis une pièce à gauche, puis clique son emplacement dans le boîtier.
+Le guide surligne la zone ; désactive-le pour rechercher seul les emplacements.
+La colonne de droite présente le rôle de chaque élément et une question
+pour la classe. Cliquer une pièce déjà installée permet de relire sa fiche.
+
+Le montage comprend le boîtier, la carte mère, le CPU, la pâte thermique,
+deux barrettes de RAM, le SSD NVMe, le ventirad, la carte graphique,
+l'alimentation, les ventilateurs et les câbles ATX, CPU/EPS et GPU/PCIe.
+Les connexions CPU_FAN et SYS_FAN sont automatiques dans ce modèle.
+Le SSD NVMe ne demande pas de câble SATA.
+
+**Démarrer le PC** vérifie le montage. Si des éléments manquent, le message
+les indique ; complète le montage et réessaie. Après réussite, les ventilateurs
+s'animent et l'air circule. Le POST validé signifie ici « matériel prêt » :
+le système d'exploitation reste à installer sur le SSD, hors de ce mode.
+
+Tu peux retirer les pièces pour expérimenter ; les dépendances doivent être
+retirées avant leur support. **Recommencer** vide seulement le montage après
+confirmation, jamais la campagne. L'état du PC est sauvegardé à chaque
+modification, indépendamment de la partie de fusion suspendue.
+
+![Montage du PC](docs/montage_pc.png)
+
+Cette configuration est supposée compatible et représente un PC avec GPU
+dédié. Ce n'est pas un simulateur de compatibilité entre références réelles.
+Les zones et trajets de câbles sont schématiques. Sur de vrais PC, le GPU
+dédié, les câbles et le nombre de ventilateurs varient selon la configuration.
+Écran, clavier, souris et système d'exploitation sont hors du montage interne.
+Voir `docs/INTRO_ARCHITECTURE.md` pour une proposition de séance de 15 minutes.
+
+## Mettre à jour depuis la V3
+
+Extraire ce ZIP dans un nouveau dossier et utiliser ses lanceurs.
+Les crédits, constructions, records et bonus sont conservés automatiquement.
+Une tentative V3 suspendue conserve ses anciennes règles jusqu'à sa fin ;
+recommencer ou lancer une autre mission applique l'équilibrage V3.1.
+Les anciens records et étoiles restent conservés. Fermer le jeu précédent
+avant de lancer cette version ; garder une copie du JSON permet un retour
+à l'ancienne version si nécessaire.
 
 ## Installation Windows
 
@@ -85,8 +140,8 @@ de jeu, sans achat en argent réel.
 
 ## Sauvegarde
 
-La progression, les charges, une tentative suspendue et une partie libre
-sont conservées dans `%LOCALAPPDATA%/CircuitMerge/project_q_v3.json` sous
+La progression, les charges, une tentative suspendue une partie libre et le montage PC
+sont conservés dans `%LOCALAPPDATA%/CircuitMerge/project_q_v3.json` sous
 Windows, ou `~/CircuitMerge/project_q_v3.json` sans LOCALAPPDATA.
 Sauvegarde à l'achat, à la suspension, au résultat, à la fermeture et toutes
 les dix secondes pendant le jeu. Pour une copie de sécurité, ferme le jeu

@@ -12,7 +12,7 @@ class WorldView(View):
         super().__init__()
         self.world_time=0.; self.worker=Personality(2026)
         self.tool=None; self.profile=None; self.flash=0.
-        self.subtitle='V3 / Projet Q — Chaque fusion fait avancer le chantier.'
+        self.subtitle='V3.1 / Projet Q — Chaque fusion fait avancer le chantier.'
     def advance_world(self,dt,menu=True):
         self.world_time+=dt; self.worker.advance(dt); self.flash=max(0,self.flash-dt)
         if menu: self.toast_time=max(0,self.toast_time-dt)
@@ -103,6 +103,7 @@ class WorldView(View):
         for i in range(5):
             pygame.draw.rect(self.canvas,C.TEAL if i==0 and p.buildings==5 else C.LINE,(756+i*61,465,51,7),border_radius=3)
         self.wrapped('Suite du projet : contrôle avancé, cryogénie, qubits et calibration.',756,490,306,18,C.MUTED,20)
+        self.button('pc','Mode libre : Montage PC',(735,565,353,43),mouse,True)
         self.text('LES MISSIONS DU CHAPITRE',(34,570),24)
         self.text('Première victoire : prime de recherche. Rejouer : crédits et étoiles.',(34,600),18,C.MUTED)
         for i,m in enumerate(MISSIONS):
