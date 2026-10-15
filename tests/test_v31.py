@@ -9,6 +9,7 @@ import pygame
 from circuit_merge.campaign import MissionEngine,MISSIONS,Profile,CampaignStore
 from circuit_merge.pc_builder import PCBuild,PARTS
 from circuit_merge.pc_view import ZONES
+from circuit_merge.pc_layout import PAGES
 from circuit_merge.project_app import ProjectApplication
 
 class BalanceTests(unittest.TestCase):
@@ -85,9 +86,14 @@ class AssemblyUITests(unittest.TestCase):
             rect=a._viewport(); x,y=logical
             a._press((rect.x+x*rect.width/1120,rect.y+y*rect.height/900));a.draw()
         for k in PARTS:
-            click(a.view.buttons['pc:select:'+k].center)
-            click(pygame.Rect(ZONES[k]).center)
-            self.assertIn(k,a.pc.installed)
+            a.action('pc:page:'+str(0 if k in PAGES[0] else 1));a.draw()
+            rect=a._viewport()
+            def native(pos):return (rect.x+pos[0]*rect.width/1120,rect.y+pos[1]*rect.height/900)
+            source=native(a.view.pc_cards[k].center);target=native(pygame.Rect(ZONES[k]).center)
+            a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONDOWN,pos=source,button=1))
+            a.handle_event(pygame.event.Event(pygame.MOUSEMOTION,pos=target,rel=(0,0),buttons=(1,0,0)))
+            a.handle_event(pygame.event.Event(pygame.MOUSEBUTTONUP,pos=target,button=1))
+            a.draw();self.assertIn(k,a.pc.installed)
         click(a.view.buttons['pc:boot'].center)
         self.assertTrue(a.pc.booted);self.assertEqual(a.engine.drops,0)
         a.handle_event(pygame.event.Event(pygame.KEYDOWN,key=pygame.K_SPACE))

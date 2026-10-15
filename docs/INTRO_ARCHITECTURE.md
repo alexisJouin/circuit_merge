@@ -1,5 +1,10 @@
 # Une introduction à l'architecture matérielle — 15 minutes
 
+Manipulation V3.2 : maintenir une vignette du stock, glisser et relâcher
+sur le connecteur. Les onglets Pièces et Finition contiennent tout le matériel.
+Le guide est désactivé par défaut ; la sérigraphie du PCB reste visible.
+Échap annule une prise. Un clic simple consulte seulement la fiche.
+
 Objectif : distinguer calcul, mémoire temporaire, stockage, communication,
 alimentation et refroidissement à partir d'un montage de PC.
 

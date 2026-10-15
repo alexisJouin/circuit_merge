@@ -1,134 +1,106 @@
-"""Tour PC dessinée en 2D : pièces cliquables, connecteurs et flux d'air."""
-import math
+"""Montage : stock illustré à glisser et carte mère lisible sans surlignage."""
 import pygame
 from . import config as C
 from .pc_builder import PARTS
+from .pc_layout import ZONES, PLACED, PAGES, accepts
+from .pc_art import fan, board, part_image, socket
 
-# Zones de pose. Les étapes superposées utilisent uniquement la zone sélectionnée.
-ZONES={
- 'case':(304,143,510,620),'board':(377,230,310,355),
- 'cpu':(464,292,86,80),'paste':(464,292,86,80),
- 'ram':(590,273,55,154),'ssd':(462,424,115,26),
- 'cooler':(447,273,121,133),'gpu':(395,484,292,73),
- 'psu':(340,641,245,84),'fans':(717,217,77,344),
- 'atx':(663,300,23,100),'eps':(406,236,75,22),'pcie':(611,482,58,24),
-}
-
-def fan(s,x,y,r,t,on=False):
-    pygame.draw.circle(s,(9,17,29),(x,y),r)
-    pygame.draw.circle(s,(64,223,201) if on else (85,114,149),(x,y),r,3)
-    for n in range(7):
-        a=n*math.tau/7+(t*3 if on else .2)
-        pts=[(x+math.cos(a)*r*.24,y+math.sin(a)*r*.24),
-             (x+math.cos(a+.12)*r*.85,y+math.sin(a+.12)*r*.85),
-             (x+math.cos(a+.65)*r*.75,y+math.sin(a+.65)*r*.75),
-             (x+math.cos(a+.5)*r*.32,y+math.sin(a+.5)*r*.32)]
-        pygame.draw.polygon(s,(48,69,91),pts)
-    pygame.draw.circle(s,(92,120,147),(x,y),round(r*.22))
-
-def render_pc(v,b,selected,mouse,guide=True,confirm=False):
+def render_pc(v,b,selected,mouse,guide=False,confirm=False,drag=None,page=0):
     s=v.canvas; done=b.installed; on=b.booted
-    v.buttons.clear(); s.blit(v.background,(0,0))
+    v.buttons.clear(); v.pc_cards={}; s.blit(v.background,(0,0))
     v.text('ATELIER ARCHITECTURE',(27,25),36,C.TEAL)
-    v.text('Montage PC · Manipule, observe, explique.',(28,68),22,C.MUTED)
+    v.text('Prends une pièce, glisse-la, puis relâche sur son emplacement.',(28,68),22,C.MUTED)
     v.button('hub','Chantier',(925,27,167,43),mouse)
     v.panel((24,110,247,683))
-    v.text('LES COMPOSANTS',(42,130),22,C.TEAL)
-    for i,(key,p) in enumerate(PARTS.items()):
-        y=169+i*40
-        v.button('pc:select:'+key,('[OK]  ' if key in done else '+  ')+p.short,(38,y,219,33),mouse,key==selected)
-    v.wrapped('Choisis une pièce puis clique son emplacement dans la tour.',43,712,205,20,C.MUTED,24)
-    # Boîtier ouvert : profondeur, pieds, panneaux et compartiment PSU.
+    v.text('STOCK DE COMPOSANTS',(39,128),20,C.TEAL)
+    v.button('pc:page:0','Pièces',(38,159,104,32),mouse,page==0)
+    v.button('pc:page:1','Finition',(150,159,107,32),mouse,page==1)
+    if not hasattr(v,'pc_icons'):
+        v.pc_icons={k:part_image(k,(78,59)) for k in PARTS}
+    for i,key in enumerate(PAGES[page]):
+        r=pygame.Rect(38,204+i*77,219,70)
+        v.pc_cards[key]=r
+        v.buttons['pc:select:'+key]=r
+        color=(40,66,77) if key==selected else (25,42,54)
+        if r.collidepoint(mouse): color=(40,65,79)
+        pygame.draw.rect(s,color,r,border_radius=8)
+        pygame.draw.rect(s,C.TEAL if key==selected else C.LINE,r,2 if key==selected else 1,border_radius=8)
+        icon=v.pc_icons[key]
+        s.blit(icon,icon.get_rect(center=(r.x+44,r.centery)))
+        v.wrapped(PARTS[key].short,r.x+88,r.y+10,125,20,C.TEXT,21)
+        v.text('Installé' if key in done else 'Glisser',(r.x+89,r.y+49),16,C.TEAL if key in done else C.MUTED)
+        if key in done:pygame.draw.circle(s,C.TEAL,(r.right-9,r.y+9),3)
+    v.text('Échap : annuler le déplacement',(41,764),18,C.MUTED)
+    # Châssis, rails, entretoises et passages de câbles restent visibles.
     pygame.draw.polygon(s,(25,34,48),[(304,143),(782,143),(813,168),(813,760),(304,760)])
     pygame.draw.rect(s,(54,70,88) if 'case' in done else (30,40,54),(304,143,478,617),border_radius=13)
     pygame.draw.rect(s,(12,20,32),(319,182,446,555),border_radius=9)
-    pygame.draw.rect(s,(45,61,79),(330,756,52,14),border_radius=4)
-    pygame.draw.rect(s,(45,61,79),(701,756,52,14),border_radius=4)
+    for x in (330,701):pygame.draw.rect(s,(45,61,79),(x,756,52,14),border_radius=4)
     pygame.draw.line(s,C.TEAL if on else (67,92,114),(327,166),(728,166),3)
     pygame.draw.circle(s,C.TEAL if on else C.ORANGE,(748,164),6,2)
     v.text('NOVA / OPEN LAB',(339,150),20,C.TEXT)
     pygame.draw.rect(s,(24,34,48),(326,614,431,117),border_radius=6)
-    v.text('ALIMENTATION',(611,682),16,C.MUTED)
+    for y in (248,373,490):pygame.draw.rect(s,(5,12,21),(711,y,9,44),border_radius=4)
+    for y in (258,386,515):
+        pygame.draw.circle(s,(43,59,70),(751,y),32,1)
+        for dx,dy in ((-25,-25),(25,-25),(25,25),(-25,25)):
+            pygame.draw.circle(s,(92,112,127),(751+dx,y+dy),2)
     if 'case' not in done:
-        v.wrapped('Pose le boîtier pour commencer.',391,350,286,32,C.MUTED,36)
-    if 'board' in done:
-        pygame.draw.rect(s,(24,75,77),(377,230,310,355),border_radius=6)
-        pygame.draw.rect(s,(65,135,132),(377,230,310,355),2,border_radius=6)
-        for k in range(10):
-            col=(37,100,101)
-            pygame.draw.lines(s,col,False,[(385,273+k*23),(420+k*5,273+k*23),(440+k*5,293+k*23),(675,293+k*23)],1)
-        for x,y in ((386,239),(677,239),(386,574),(677,574)):
-            pygame.draw.circle(s,(178,189,185),(x,y),3)
-        for x,y in ((396,274),(415,274),(434,274),(397,406),(416,406)):
-            pygame.draw.rect(s,(45,53,67),(x,y,13,25),border_radius=2)
-        pygame.draw.rect(s,(43,52,61),ZONES['cpu'],border_radius=4)
-        pygame.draw.rect(s,(173,179,173),ZONES['cpu'],2,border_radius=4)
-        for x in (590,620): pygame.draw.rect(s,(8,20,28),(x,273,20,154),border_radius=3)
-        pygame.draw.rect(s,(9,23,31),(399,490,271,13),border_radius=2)
-        pygame.draw.rect(s,(10,30,38),ZONES['ssd'],border_radius=2)
-        pygame.draw.rect(s,(219,177,87),(663,300,20,100),2)
-        pygame.draw.rect(s,(219,177,87),ZONES['eps'],2)
-        pygame.draw.circle(s,(174,190,195),(638,553),16)
-        v.text('M.2',(583,429),16,C.MUTED)
-    if 'cpu' in done:
-        pygame.draw.rect(s,(173,186,199),(472,300,70,64),border_radius=3)
-        pygame.draw.rect(s,(215,225,232),(480,308,54,48),border_radius=3)
-        v.text('CPU',(507,331),22,(30,46,61),True)
-    if 'paste' in done:
-        pygame.draw.circle(s,(211,216,225),(508,332),8)
+        v.wrapped('Glisse le boîtier sur cette zone de travail.',388,352,295,32,C.MUTED,36)
+    elif 'board' not in done:
+        pygame.draw.rect(s,(28,42,52),ZONES['board'],1,border_radius=5)
+        for x,y in ((361,225),(698,225),(361,583),(698,583),(361,409),(698,409)):
+            pygame.draw.circle(s,(180,152,94),(x,y),5)
+            pygame.draw.circle(s,(30,34,31),(x,y),2)
+        v.text('PLATEAU / ENTRETOISES',(384,395),20,C.MUTED)
+    if 'board' in done:board(s,ZONES['board'],v.fonts)
+    def draw_part(key):
+        rect=pygame.Rect(PLACED[key]);im=part_image(key,rect.size,v.world_time,on)
+        s.blit(im,im.get_rect(center=rect.center))
+    if 'cpu' in done:draw_part('cpu')
+    if 'paste' in done:pygame.draw.circle(s,(217,222,228),(489,327),7)
     if 'ram' in done:
-        for x in (592,622):
-            pygame.draw.rect(s,(53,79,106),(x,274,16,152),border_radius=3)
-            for y in range(290,413,22):pygame.draw.rect(s,(17,25,39),(x+3,y,10,17),border_radius=2)
-            pygame.draw.line(s,(158,125,244),(x+4,281),(x+12,281),3)
-    if 'ssd' in done:
-        pygame.draw.rect(s,(26,36,53),(463,425,113,24),border_radius=3)
-        pygame.draw.rect(s,(200,208,212),(480,429,66,16),border_radius=2)
-        v.text('NVMe',(487,430),16,(35,47,66))
-        pygame.draw.circle(s,(191,170,111),(568,437),3)
+        for x in (594,642):
+            pygame.draw.rect(s,(33,88,71),(x,271,17,150),border_radius=2)
+            pygame.draw.rect(s,(110,122,142),(x+1,274,14,142),border_radius=3)
+            pygame.draw.line(s,(171,129,237),(x+3,279),(x+12,279),3)
+            for y in range(294,403,24):pygame.draw.rect(s,(13,24,33),(x+3,y,10,17),border_radius=2)
+    if 'ssd' in done:draw_part('ssd')
     if 'cooler' in done:
-        pygame.draw.rect(s,(98,114,130),(448,274,118,131),border_radius=7)
-        for y in range(279,400,7):pygame.draw.line(s,(49,66,82),(454,y),(560,y),2)
-        fan(s,507,338,49,v.world_time,on)
-        pygame.draw.lines(s,(225,190,100),False,[(562,284),(574,284),(574,261),(548,261)],2)
-    if 'gpu' in done:
-        pygame.draw.rect(s,(33,45,64),(395,484,292,73),border_radius=7)
-        pygame.draw.rect(s,(83,109,137),(395,484,292,73),2,border_radius=7)
-        fan(s,449,521,28,v.world_time,on);fan(s,527,521,28,v.world_time,on)
-        pygame.draw.line(s,(171,119,251),(576,537),(671,537),3)
-        v.text('GPU',(600,507),24,C.TEXT)
-        pygame.draw.rect(s,(181,171,143),(611,482,58,10),border_radius=2)
-    if 'psu' in done:
-        pygame.draw.rect(s,(54,67,84),ZONES['psu'],border_radius=6)
-        fan(s,389,683,32,0,False)
-        v.text('PSU',(444,658),28,C.TEXT)
-        v.text('AC → DC',(445,697),20,C.TEAL)
+        draw_part('cooler')
+        pygame.draw.lines(s,(225,190,100),False,[(549,281),(560,281),(560,242),(529,242)],2)
+    if 'gpu' in done:draw_part('gpu')
+    if 'psu' in done:draw_part('psu')
+    else:
+        v.text('PSU / BLOC ALIMENTATION',(360,680),20,C.MUTED)
+        for y in range(647,724,8):pygame.draw.line(s,(42,55,66),(350,y),(372,y),2)
     if 'fans' in done:
-        for y in (262,391,520): fan(s,751,y,34,v.world_time,on)
-        fan(s,345,252,22,v.world_time,on)
-        # Flux avant vers arrière, uniquement quand le PC fonctionne.
+        for y in (258,386,515):fan(s,751,y,32,v.world_time,on)
+        fan(s,331,262,20,v.world_time,on)
         if on:
-            for y in (262,391,520):
-                x=704-int(v.world_time*34)%65
-                pygame.draw.line(s,C.TEAL,(x+17,y),(x,y),2)
-                pygame.draw.lines(s,C.TEAL,False,[(x+6,y-5),(x,y),(x+6,y+5)],2)
+            for y in (258,386,515):
+                x=713-int(v.world_time*34)%40
+                pygame.draw.line(s,C.TEAL,(x+14,y),(x,y),2)
+                pygame.draw.lines(s,C.TEAL,False,[(x+5,y-4),(x,y),(x+5,y+4)],2)
     cables={
-      'atx':([(570,668),(704,668),(704,350),(675,350)],(86,218,199)),
-      'eps':([(560,656),(353,656),(353,214),(444,214),(444,246)],(238,184,88)),
-      'pcie':([(578,684),(697,684),(697,467),(641,467),(641,487)],(175,133,241)),
+      'atx':([(570,698),(720,698),(720,344),(687,344)],(86,218,199)),
+      'eps':([(558,650),(330,650),(330,201),(428,201),(428,240)],(238,184,88)),
+      'pcie':([(578,714),(704,714),(704,472),(638,472),(638,493)],(175,133,241)),
     }
-    for k,(pts,col) in cables.items():
-        if k in done:
+    for key,(pts,col) in cables.items():
+        if key in done:
             pygame.draw.lines(s,(8,13,22),False,pts,10)
             pygame.draw.lines(s,col,False,pts,4)
-            pygame.draw.rect(s,col,(*pts[-1],10,10),border_radius=2)
+            r=pygame.Rect(ZONES[key])
+            pygame.draw.rect(s,(40,45,50),r,border_radius=2)
+            pygame.draw.rect(s,col,r,2,border_radius=2)
+    # La sérigraphie est physique et permanente. Le guide ajoute seulement un halo.
     if selected and guide:
         rect=pygame.Rect(ZONES[selected])
         pygame.draw.rect(s,C.TEAL if selected in done else C.ORANGE,rect.inflate(8,8),2,border_radius=6)
-        label=PARTS[selected].destination
-        v.text(label,(550,793),22,C.TEAL,True)
-        if selected not in done:
-            v.text('Clique ici',(rect.centerx,rect.top-18),18,C.ORANGE,True)
+        v.text(PARTS[selected].destination,(550,793),22,C.TEAL,True)
+    elif 'board' in done:
+        v.text('Repère les formes, contacts, clips et inscriptions.',(550,793),20,C.MUTED,True)
     v.panel((839,110,257,683),C.TEAL)
     v.text('COMPRENDRE',(856,130),22,C.TEAL)
     if selected:
@@ -140,7 +112,7 @@ def render_pc(v,b,selected,mouse,guide=True,confirm=False):
         v.button('pc:remove','Retirer cette pièce',(855,685,225,38),mouse)
     else:
         v.wrapped('Un PC complet : calcul, mémoire, stockage, énergie et refroidissement.',856,182,220,28,C.TEXT,32)
-        v.wrapped('Sélectionne une pièce pour découvrir son rôle. Le guide peut être masqué pour te tester.',856,366,220,22,C.MUTED,27)
+        v.wrapped('Maintiens une pièce du stock, déplace-la et relâche sur son connecteur. Les inscriptions du circuit restent visibles sans guide.',856,366,220,22,C.MUTED,27)
     v.text(f'{len(done)} / {len(PARTS)} étapes',(855,749),26,C.TEAL)
     v.button('pc:guide','Guide : '+('ON' if guide else 'OFF'),(25,816,179,42),mouse)
     v.button('pc:reset','Recommencer',(218,816,190,42),mouse)
@@ -155,5 +127,17 @@ def render_pc(v,b,selected,mouse,guide=True,confirm=False):
         v.wrapped('Seul le montage PC sera vidé. Ta campagne et tes crédits sont conservés.',300,373,520,26,C.MUTED,30)
         v.button('pc:cancel','Continuer',(300,503,233,46),mouse)
         v.button('pc:confirm','Vider le boîtier',(551,503,269,46),mouse,True)
+    if drag:
+        key=drag['key']
+        # La pièce reste attachée au pointeur jusqu'au relâchement.
+        carried=part_image(key,(156,130))
+        carried.set_alpha(220)
+        rect=carried.get_rect(center=(round(mouse[0]),round(mouse[1])))
+        shadow=pygame.Surface(carried.get_size(),pygame.SRCALPHA)
+        shadow.fill((0,0,0,75));s.blit(shadow,rect.move(5,6));s.blit(carried,rect)
+        pygame.draw.circle(s,(251,233,190),(round(mouse[0]),round(mouse[1])),4,1)
+        if guide and accepts(key,mouse):
+            color=C.TEAL if set(PARTS[key].needs)<=done else C.ORANGE
+            pygame.draw.rect(s,color,pygame.Rect(ZONES[key]).inflate(8,8),3,border_radius=4)
     v.toast_layer()
     return s

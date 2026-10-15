@@ -12,7 +12,7 @@ class WorldView(View):
         super().__init__()
         self.world_time=0.; self.worker=Personality(2026)
         self.tool=None; self.profile=None; self.flash=0.
-        self.subtitle='V3.1 / Projet Q — Chaque fusion fait avancer le chantier.'
+        self.subtitle='V3.2 / Projet Q — Chaque fusion fait avancer le chantier.'
     def advance_world(self,dt,menu=True):
         self.world_time+=dt; self.worker.advance(dt); self.flash=max(0,self.flash-dt)
         if menu: self.toast_time=max(0,self.toast_time-dt)

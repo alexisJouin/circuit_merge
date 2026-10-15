@@ -8,7 +8,8 @@ from .engine import GameEngine
 from .campaign import Profile,CampaignStore,MissionEngine,BUILDINGS
 from .world_view import WorldView
 from .pc_builder import PCBuild, PARTS
-from .pc_view import render_pc, ZONES
+from .pc_view import render_pc
+from .pc_layout import ZONES, PLACED, PAGES, accepts
 
 class ProjectApplication(Application):
     def __init__(self,*,save_path=None,persist=True,muted=False):
@@ -16,12 +17,13 @@ class ProjectApplication(Application):
         self.project_persist=persist; self.campaign_store=CampaignStore(save_path)
         self.profile=self.campaign_store.load() if persist else Profile()
         self.pc=PCBuild.restore(self.profile.pc_build) if self.profile.pc_build else PCBuild()
-        self.pc_selected=None; self.pc_guide=True; self.pc_confirm=False
+        self.pc_selected=None; self.pc_guide=False; self.pc_confirm=False
+        self.pc_drag=None; self.pc_page=0
         super().__init__(persist=False,muted=muted,save_path=Path.cwd()/'unused_v2.json')
         self.view=WorldView(); self.audio.enabled=self.profile.sound and not muted
         self.profile.sound=self.audio.enabled
         self.ready=True; self.engine=GameEngine(3); self.mode=None; self.best=self.profile.best
-        pygame.display.set_caption('Circuit Merge V3.1 — Projet Q / Chapitre 1')
+        pygame.display.set_caption('Circuit Merge V3.2 — Projet Q / Chapitre 1')
         if self.campaign_store.error: self.view.notify(self.campaign_store.error,8)
         self.draw()
     @property
@@ -48,12 +50,15 @@ class ProjectApplication(Application):
         self.page='play'; self.mode=None; self.profile.active=self.engine.campaign_snapshot(); self.save()
     def action(self,name):
         if not self.ready: return
+        if name in ('pc','hub','quit') or name.startswith('pc:'):
+            self.pc_drag=None
         if name=='pc':
             self.save(); self.page='pc'; self.mode=None; self.pc_confirm=False
         elif name.startswith('pc:'):
             action=name[3:]
             if action.startswith('select:'):
                 self.pc_selected=action.split(':')[1]
+            elif action.startswith('page:'): self.pc_page=int(action[-1])
             elif action=='guide': self.pc_guide=not self.pc_guide
             elif action=='reset': self.pc_confirm=True
             elif action=='cancel': self.pc_confirm=False
@@ -112,20 +117,75 @@ class ProjectApplication(Application):
         elif name=='new' and isinstance(self.engine,MissionEngine): self.mode='restart'
         else: super().action(name)
         self.accumulator=0
+    def _pc_press(self,pos,button=1,pointer='mouse'):
+        self.mouse=self.logical_position(pos)
+        if button==3:
+            self.pc_drag=None; return
+        if button!=1 or self.pc_drag is not None: return
+        # Les cartes sont des objets à saisir, pas des boutons d'installation.
+        if not self.pc_confirm:
+            for key,rect in getattr(self.view,'pc_cards',{}).items():
+                if rect.collidepoint(self.mouse):
+                    self.pc_selected=key
+                    if key not in self.pc.installed:
+                        self.pc_drag={'key':key,'start':self.mouse,'pointer':pointer}
+                    return
+        for name,rect in self.view.buttons.items():
+            if rect.collidepoint(self.mouse):
+                self.action(name); self.draw(); return
+        if not self.pc_confirm:
+            for key in reversed(tuple(PARTS)):
+                if key in self.pc.installed and pygame.Rect(PLACED[key]).collidepoint(self.mouse):
+                    self.pc_selected=key; return
+
+    def _pc_release(self,pos,pointer='mouse'):
+        if not self.pc_drag or self.pc_drag['pointer']!=pointer: return
+        self.mouse=self.logical_position(pos)
+        drag=self.pc_drag; self.pc_drag=None
+        # Un clic simple ouvre la fiche ; seul un vrai déplacement pose la pièce.
+        if pygame.Vector2(self.mouse).distance_to(drag['start'])<6: return
+        key=drag['key']
+        if self.mouse==(-1.0,-1.0) or not accepts(key,self.mouse):
+            self.view.notify('Pose refusée : '+PARTS[key].short+' rejoint '+PARTS[key].destination.lower()+'.',6)
+            return
+        ok,msg=self.pc.install(key)
+        self.view.notify(msg,6)
+        if ok: self.save()
+
+    def _pc_event(self,event):
+        if event.type in (pygame.QUIT,pygame.WINDOWFOCUSLOST,pygame.VIDEORESIZE):
+            self.pc_drag=None
+            if event.type==pygame.QUIT: self.save(); self.running=False
+            elif event.type==pygame.VIDEORESIZE:
+                self.screen=pygame.display.set_mode((max(500,event.w),max(420,event.h)),pygame.RESIZABLE)
+            return
+        if event.type==pygame.KEYDOWN:
+            if event.key==pygame.K_ESCAPE:
+                if self.pc_drag: self.pc_drag=None
+                elif self.pc_confirm: self.pc_confirm=False
+                else: self.action('hub')
+            elif event.key==pygame.K_m: self.action('sound')
+            return
+        # SDL peut doubler un toucher avec des événements souris synthétiques.
+        if event.type in (pygame.MOUSEBUTTONDOWN,pygame.MOUSEBUTTONUP,pygame.MOUSEMOTION):
+            if getattr(event,'touch',False): return
+            if self.pc_drag and self.pc_drag['pointer']!='mouse': return
+            if event.type==pygame.MOUSEBUTTONDOWN: self._pc_press(event.pos,event.button)
+            elif event.type==pygame.MOUSEBUTTONUP and event.button==1: self._pc_release(event.pos)
+            elif event.type==pygame.MOUSEMOTION: self.mouse=self.logical_position(event.pos)
+        elif event.type in (pygame.FINGERDOWN,pygame.FINGERUP,pygame.FINGERMOTION):
+            pointer=('finger',event.finger_id)
+            if self.pc_drag and self.pc_drag['pointer']!=pointer: return
+            w,h=self.screen.get_size(); pos=(event.x*w,event.y*h)
+            if event.type==pygame.FINGERDOWN: self._pc_press(pos,pointer=pointer)
+            elif event.type==pygame.FINGERUP: self._pc_release(pos,pointer)
+            else: self.mouse=self.logical_position(pos)
+
     def _press(self,pos,button=1):
+        if self.page=='pc': return self._pc_press(pos,button)
         self.mouse=self.logical_position(pos)
         for name,rect in self.view.buttons.items():
             if button==1 and rect.collidepoint(self.mouse): self.action(name); self.draw(); return
-        if self.page=='pc' and button==1 and not self.pc_confirm:
-            if self.pc_selected:
-                if pygame.Rect(ZONES[self.pc_selected]).collidepoint(self.mouse):
-                    ok,msg=self.pc.install(self.pc_selected)
-                    self.view.notify(msg,6)
-                    if ok: self.save()
-                else:
-                    self.view.notify('Emplacement attendu : '+PARTS[self.pc_selected].destination+'.',5)
-            else: self.view.notify('Choisis une pièce dans la liste à gauche.',4)
-            return
         if self.active and self.view.tool=='remove'  and button==1:
             p=self.engine.piece_at(*self.mouse)
             if p and self.profile.use(self.engine,'remove',p.uid):
@@ -135,6 +195,7 @@ class ProjectApplication(Application):
             return
         if self.page=='play': super()._press(pos,button)
     def handle_event(self,event):
+        if self.page=='pc': return self._pc_event(event)
         if event.type==pygame.KEYDOWN and event.key==pygame.K_ESCAPE and self.view.tool:
             self.view.tool=None; return
         if self.page=='play': return super().handle_event(event)
@@ -158,7 +219,7 @@ class ProjectApplication(Application):
     def draw(self):
         if not self.ready: return super().draw()
         p=self.profile
-        if self.page=='pc': canvas=render_pc(self.view,self.pc,self.pc_selected,self.mouse,self.pc_guide,self.pc_confirm)
+        if self.page=='pc': canvas=render_pc(self.view,self.pc,self.pc_selected,self.mouse,self.pc_guide,self.pc_confirm,self.pc_drag,self.pc_page)
         elif self.page=='hub': canvas=self.view.render_hub(p,self.mouse,p.active)
         elif self.page=='shop': canvas=self.view.render_shop(p,self.mouse)
         elif self.page=='briefing': canvas=self.view.render_briefing(p,self.selected,self.mouse)

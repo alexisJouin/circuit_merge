@@ -1,4 +1,4 @@
-# Circuit Merge V3.1 — Projet Q + Montage PC
+# Circuit Merge V3.2 — Projet Q + Montage PC
 
 Construis le laboratoire qui accueillera ton ordinateur quantique !
 Cette version livre **le chapitre 1 : Fondations**, avec dix missions,
@@ -8,7 +8,23 @@ suivants et la finalisation de l'ordinateur ne sont pas encore jouables.
 ![Le chantier](docs/chantier_v31.png)
 
 
-## Nouveautés V3.1
+## Nouveautés V3.2
+
+- Vrai glisser-déposer : maintenir une pièce du stock, la déplacer puis
+  relâcher sur le connecteur. Un clic simple ouvre seulement sa fiche.
+- Stock illustré en deux onglets, **Pièces** et **Finition**, avec des
+  silhouettes distinctes pour CPU, RAM, GPU, SSD, ventirad et câbles.
+- Carte mère agrandie et détaillée : socket et levier CPU, contacts,
+  quatre logements DIMM avec clips, M.2 et vis, port PCIe x16 avec loquet,
+  connecteurs ATX 24 et CPU/EPS, pile, dissipateurs et ports arrière.
+- Guide désactivé par défaut : les inscriptions du circuit restent visibles.
+- Mauvais emplacement ou prérequis manquant : la pièce reste dans le stock
+  et une explication apparaît. Échap ou clic droit annule le déplacement.
+- Campagne, crédits et montage précédemment sauvegardé sont conservés.
+
+![Carte mère sans guide](docs/carte_mere_v32.png)
+
+## Équilibrage conservé de la V3.1
 
 - Dix missions rééquilibrées : de 24 à 100 lâchers dans les solutions de test,
   au lieu de 1 à 11 pour plusieurs anciennes missions. Ce sont des essais,
@@ -22,8 +38,18 @@ suivants et la finalisation de l'ordinateur ne sont pas encore jouables.
 ## Montage PC — introduction à l'architecture matérielle
 
 Depuis le chantier, clique **Mode libre : Montage PC**.
-Choisis une pièce à gauche, puis clique son emplacement dans le boîtier.
-Le guide surligne la zone ; désactive-le pour rechercher seul les emplacements.
+Maintiens le clic gauche sur une vignette du stock, déplace la pièce dans
+le boîtier, puis relâche au-dessus de son emplacement. Le petit repère au
+centre de la pièce portée indique le point de dépose. Pour la carte graphique,
+vise le port PCI Express x16 ; pour les câbles, vise leur connecteur.
+Un clic sans déplacement consulte la fiche et ne pose rien.
+
+Les onglets **Pièces** et **Finition** donnent accès à tout le stock.
+Le guide est OFF par défaut ; active-le si tu souhaites un surlignage.
+Sans guide, utilise les formes, clips, contacts et inscriptions sur le PCB.
+La RAM est un kit de deux barrettes qui se fixe ici dans A2 et B2.
+Le déplacement fonctionne aussi au toucher. Échap ou clic droit annule ;
+sortir de la fenêtre ou la redimensionner ne provoque aucune installation.
 La colonne de droite présente le rôle de chaque élément et une question
 pour la classe. Cliquer une pièce déjà installée permet de relire sa fiche.
 
@@ -43,7 +69,7 @@ retirées avant leur support. **Recommencer** vide seulement le montage après
 confirmation, jamais la campagne. L'état du PC est sauvegardé à chaque
 modification, indépendamment de la partie de fusion suspendue.
 
-![Montage du PC](docs/montage_pc.png)
+![Montage du PC](docs/pc_complet_v32.png)
 
 Cette configuration est supposée compatible et représente un PC avec GPU
 dédié. Ce n'est pas un simulateur de compatibilité entre références réelles.
@@ -52,7 +78,7 @@ dédié, les câbles et le nombre de ventilateurs varient selon la configuration
 Écran, clavier, souris et système d'exploitation sont hors du montage interne.
 Voir `docs/INTRO_ARCHITECTURE.md` pour une proposition de séance de 15 minutes.
 
-## Mettre à jour depuis la V3
+## Mettre à jour depuis la V3 ou V3.1
 
 Extraire ce ZIP dans un nouveau dossier et utiliser ses lanceurs.
 Les crédits, constructions, records et bonus sont conservés automatiquement.
@@ -64,7 +90,7 @@ avant de lancer cette version ; garder une copie du JSON permet un retour
 
 ## Installation Windows
 
-1. Extraire entièrement le ZIP dans un nouveau dossier `Circuit_Merge_V3`.
+1. Extraire entièrement le ZIP dans un nouveau dossier `Circuit_Merge_V3_2`.
 2. Avec Python 3.10 à 3.14 installé, lancer `Installer_Windows.bat`.
 3. Lancer `Lancer_Windows.bat`.
 
