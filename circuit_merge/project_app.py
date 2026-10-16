@@ -20,10 +20,10 @@ class ProjectApplication(Application):
         self.pc_selected=None; self.pc_guide=False; self.pc_confirm=False
         self.pc_drag=None; self.pc_page=0
         super().__init__(persist=False,muted=muted,save_path=Path.cwd()/'unused_v2.json')
-        self.view=WorldView(); self.audio.enabled=self.profile.sound and not muted
+        self.view=WorldView(); self.view.chapter=1 if self.profile.completed>=10 else 0; self.audio.enabled=self.profile.sound and not muted
         self.profile.sound=self.audio.enabled
         self.ready=True; self.engine=GameEngine(3); self.mode=None; self.best=self.profile.best
-        pygame.display.set_caption('Circuit Merge V3.2 — Projet Q / Chapitre 1')
+        pygame.display.set_caption('Circuit Merge V3.3 - Projet Q / Chapitres 1 et 2')
         if self.campaign_store.error: self.view.notify(self.campaign_store.error,8)
         self.draw()
     @property
@@ -72,6 +72,8 @@ class ProjectApplication(Application):
                 ok,msg=self.pc.boot(); self.view.notify(msg,9); self.save()
         elif name=='hub':
             self.save(); self.page='hub'; self.mode=None; self.view.tool=None; self.dragging=False
+        elif name.startswith('chapter:'):
+            self.view.chapter=int(name.split(':')[1]); self.page='hub'
         elif name.startswith('mission:'):
             i=int(name.split(':')[1])
             if self.profile.available(i): self.selected=i; self.page='briefing'
@@ -99,7 +101,7 @@ class ProjectApplication(Application):
         elif name=='build':
             if self.profile.build():
                 self.view.flash=3.5; self.view.notify(BUILDINGS[self.profile.buildings-1][0]+' : construction terminée !',4); self.save()
-            elif self.profile.buildings<5:
+            elif self.profile.buildings<len(BUILDINGS):
                 _,price,need,_=BUILDINGS[self.profile.buildings]
                 self.view.notify(f'Il faut {price} crédits et {need} missions réussies.',4)
         elif name.startswith('buy:'):

@@ -15,7 +15,7 @@ from circuit_merge.project_app import ProjectApplication
 class BalanceTests(unittest.TestCase):
     def test_long_missions_have_real_solutions_without_large_deliveries_or_bonus(self):
         profile=Profile()
-        for i,m in enumerate(MISSIONS):
+        for i,m in enumerate(MISSIONS[:10]):
             with self.subTest(mission=i+1):
                 self.assertLessEqual(max(m.sequence),1 if i<6 else 2)
                 e=MissionEngine(i); rng=random.Random(1)

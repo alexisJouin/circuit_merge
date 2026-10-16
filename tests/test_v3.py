@@ -37,8 +37,8 @@ class CampaignTests(unittest.TestCase):
                 self.assertEqual(e.used,set()); self.assertGreater(p.award(e),0)
                 self.assertEqual(p.award(e),0); self.assertEqual(p.stars[i],3)
         earned=p.credits
-        for _ in BUILDINGS: self.assertTrue(p.build())
-        self.assertFalse(p.build()); self.assertEqual(p.credits,earned-sum(b[1] for b in BUILDINGS))
+        for _ in BUILDINGS[:5]: self.assertTrue(p.build())
+        self.assertFalse(p.build()); self.assertEqual(p.credits,earned-sum(b[1] for b in BUILDINGS[:5]))
         self.assertTrue(25<=p.award(solve(0))<=40)
     def test_last_drop_has_time_to_resolve(self):
         e=MissionEngine(0); e.drops=e.mission.budget-2; e.created[1]=2
@@ -102,12 +102,12 @@ class ProjectUITests(unittest.TestCase):
         self.assertEqual(app.page,'result'); credits=app.profile.credits
         app.update(.016); self.assertEqual(app.profile.credits,credits)
         for page in ('result','shop','briefing','confirm','hub'): app.page=page; app.draw()
-        app.profile.stars=[3]*10; app.profile.buildings=5; app.draw(); app.start(5); app.draw()
+        app.profile.stars=[3]*10+[0]*10; app.profile.buildings=5; app.draw(); app.start(5); app.draw()
         app.action('new'); app.draw()
     def test_purchase_and_partial_mission_survive_restart(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'v3.json'; app=ProjectApplication(save_path=path,muted=True)
-            app.profile.stars=[3]*5+[0]*5; app.profile.credits=500
+            app.profile.stars=[3]*5+[0]*15; app.profile.credits=500
             app.action('buy:extra'); app.start(5); app.action('use:extra'); app.engine.drop(430); app.action('hub')
             r=ProjectApplication(save_path=path,muted=True)
             self.assertEqual(r.profile.credits,400); self.assertEqual(r.profile.inventory['extra'],0)

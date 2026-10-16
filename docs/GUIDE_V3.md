@@ -1,3 +1,5 @@
+> V3.3 : voir CHAPITRE_2.md pour les missions 11–20 et les nouveaux équipements.
+
 > Guide historique V3. Pour les objectifs actuels, voir EQUILIBRAGE_V31.md.
 > Le nouveau mode est décrit dans INTRO_ARCHITECTURE.md.
 

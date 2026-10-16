@@ -1,12 +1,27 @@
-# Circuit Merge V3.2 — Projet Q + Montage PC
+# Circuit Merge V3.3 — Projet Q + Montage PC
 
 Construis le laboratoire qui accueillera ton ordinateur quantique !
-Cette version livre **le chapitre 1 : Fondations**, avec dix missions,
-cinq constructions visibles et trois bonus facultatifs. Les chapitres
-suivants et la finalisation de l'ordinateur ne sont pas encore jouables.
+Cette version livre **deux chapitres, 20 missions et 10 constructions**.
+Le chapitre 2 « Contrôle et signaux » transforme le laboratoire en centre
+de pilotage. La cryogénie et les qubits viendront dans les chapitres suivants.
 
-![Le chantier](docs/chantier_v31.png)
+![Le centre de pilotage](docs/chapitre2_v33.png)
 
+## Nouveautés V3.3
+
+- Dix nouvelles missions (11 à 20), accessibles après la mission 10.
+- Deux onglets pour naviguer entre les chapitres depuis le chantier.
+- Petites livraisons uniquement : résistances, LED et condensateurs.
+- Objectifs de longue production, pièces marquées, bacs étroits ou moins profonds.
+- Cinq constructions : réseau de contrôle, horloge de référence, générateur
+  de signaux, chaîne de lecture et pilotage synchronisé.
+- Décor animé : impulsions, onde de commande et acquisition.
+- Progression, crédits, bonus, montage PC et mission suspendue conservés.
+
+Les solutions de test du chapitre 2 demandent **56 à 192 lâchers** sans
+bonus. Cela prouve l'existence de parcours réalisables, pas un minimum
+théorique ni une durée imposée. La difficulté ressentie reste à éprouver
+en classe. Voir [le guide du chapitre 2](docs/CHAPITRE_2.md).
 
 ## Nouveautés V3.2
 
@@ -78,19 +93,23 @@ dédié, les câbles et le nombre de ventilateurs varient selon la configuration
 Écran, clavier, souris et système d'exploitation sont hors du montage interne.
 Voir `docs/INTRO_ARCHITECTURE.md` pour une proposition de séance de 15 minutes.
 
-## Mettre à jour depuis la V3 ou V3.1
+## Mettre à jour depuis la V3, V3.1 ou V3.2
 
 Extraire ce ZIP dans un nouveau dossier et utiliser ses lanceurs.
 Les crédits, constructions, records et bonus sont conservés automatiquement.
 Une tentative V3 suspendue conserve ses anciennes règles jusqu'à sa fin ;
 recommencer ou lancer une autre mission applique l'équilibrage V3.1.
+Les anciens records et étoiles restent conservés. La sauvegarde passe
+automatiquement de 10 à 20 emplacements de mission. La V3.2 ne sait pas
+relire ce format étendu : utiliser la V3.3 après migration, ou restaurer
+une copie du JSON faite avant la mise à jour pour revenir en arrière.
 Les anciens records et étoiles restent conservés. Fermer le jeu précédent
 avant de lancer cette version ; garder une copie du JSON permet un retour
 à l'ancienne version si nécessaire.
 
 ## Installation Windows
 
-1. Extraire entièrement le ZIP dans un nouveau dossier `Circuit_Merge_V3_2`.
+1. Extraire entièrement le ZIP dans un nouveau dossier `Circuit_Merge_V3_3`.
 2. Avec Python 3.10 à 3.14 installé, lancer `Installer_Windows.bat`.
 3. Lancer `Lancer_Windows.bat`.
 
@@ -138,7 +157,7 @@ Il n'y a ni vies ni attente imposée.
 
 La première victoire paie une prime croissante, augmentée par le score.
 Rejouer rapporte aussi de 25 à 40 crédits par victoire et permet d'améliorer
-ses étoiles. Les dix premières victoires financent les cinq constructions,
+ses étoiles. Les premières victoires de chaque chapitre financent ses cinq constructions,
 si les crédits leur sont réservés. Acheter des bonus peut demander des replays.
 
 | Construction | Coût | Missions réussies |
@@ -148,6 +167,11 @@ si les crédits leur sont réservés. Acheter des bonus peut demander des replay
 | Postes de contrôle | 320 | 6 |
 | Baies de calcul | 420 | 8 |
 | Portique central | 500 | 10 |
+| Réseau de contrôle | 550 | 12 |
+| Horloge de référence | 620 | 14 |
+| Générateur de signaux | 700 | 16 |
+| Chaîne de lecture | 780 | 18 |
+| Pilotage synchronisé | 850 | 20 |
 
 Les constructions s'achètent dans cet ordre et transforment le décor.
 Elles ne changent pas les règles des missions.

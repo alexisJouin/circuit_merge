@@ -88,12 +88,56 @@ MISSIONS = (
             'Créer 2 RAM ET 850 points','create',2,level=6,score_goal=850,budget=110,par=102,
             sequence=(0,1,0,2,1,0,2,1)),
 )
+# Chapitre 2 : contrôle classique, signaux et acquisition.
+CHAPTERS = ('Fondations', 'Contrôle et signaux')
+MISSIONS += (
+    Mission('Bus de données', 'Relie les postes de contrôle avec une production régulière.',
+            '65 fusions ET 650 points', 'merge',65,score_goal=650,budget=108,par=90,
+            sequence=(0,1,0,2,1,0,1,2)),
+    Mission('Horloge de référence', 'Une horloge commune synchronise les appareils de mesure.',
+            'Créer 3 microcontrôleurs', 'create',3,level=5,budget=80,par=58,
+            sequence=(0,1,0,2,1,0,1,2),width=440),
+    Mission('Signaux propres', 'Recycle les deux composants marqués avant de valider la série.',
+            '2 pièces marquées ET 900 points', 'marked',2,score_goal=900,budget=142,par=120,
+            sequence=(0,1,0,2,1,0,1,2),
+            stock=((2,480,740,0,True),(2,632,740,0,True))),
+    Mission('Ligne de commande', 'La ligne est étroite : réserve un passage pour les petites pièces.',
+            '80 fusions ET 800 points', 'merge',80,score_goal=800,budget=120,par=97,
+            sequence=(0,1,0,2,1,0,1,2),width=400),
+    Mission('Mémoire tampon', 'Stocke les instructions avant leur envoi vers les appareils.',
+            'Créer 3 RAM', 'create',3,level=6,budget=132,par=106,
+            sequence=(0,1,0,2,1,0,1,2)),
+    Mission('Acquisition', 'Le stock initial encombre la chaîne de mesure. Maintiens le débit.',
+            '95 fusions ET 1100 points', 'merge',95,score_goal=1100,budget=152,par=127,
+            sequence=(0,1,0,2,1,0,1,2),
+            stock=((1,415,755,.2,False),(2,697,740,-.2,False))),
+    Mission('Baie compacte', 'La baie réserve moins de hauteur à ton atelier de production.',
+            'Créer 4 microcontrôleurs', 'create',4,level=5,budget=100,par=74,
+            sequence=(0,1,0,2,1,0,1,2),floor=735,width=440),
+    Mission('Retour de mesure', 'Prépare la lecture des signaux : recyclage et longue production.',
+            '2 pièces marquées ET 1300 points', 'marked',2,score_goal=1300,budget=180,par=154,
+            sequence=(0,1,0,2,1,0,1,2),
+            stock=((1,480,760,0,True),(1,632,760,0,True))),
+    Mission('Synchronisation', 'Produis les mémoires des voies de commande dans un atelier resserré.',
+            '3 RAM ET 1400 points', 'create',3,level=6,score_goal=1400,budget=200,par=175,
+            sequence=(0,1,0,2,1,0,1,2),width=420),
+    Mission('Centre de pilotage', 'Valide une longue série avant de relier commande et acquisition.',
+            '125 fusions ET 1700 points', 'merge',125,score_goal=1700,budget=218,par=194,
+            sequence=(0,1,0,2,1,0,1,2)),
+)
 BUILDINGS = (
     ('Sol technique',150,2,'Le hangar devient un laboratoire.'),
     ('Énergie sécurisée',230,4,'Alimentation, câbles et éclairage.'),
     ('Postes de contrôle',320,6,'Les consoles surveillent le chantier.'),
     ('Baies de calcul',420,8,'Le contrôle classique prend forme.'),
     ('Portique central',500,10,'Prêt pour la future installation cryogénique.'),
+)
+BUILDINGS += (
+    ('Réseau de contrôle',550,12,'Le bus relie les consoles et les baies.'),
+    ('Horloge de référence',620,14,'Une référence commune synchronise les signaux.'),
+    ('Générateur de signaux',700,16,'Les impulsions de commande sont préparées.'),
+    ('Chaîne de lecture',780,18,'Les signaux de mesure sont acquis et numérisés.'),
+    ('Pilotage synchronisé',850,20,'Le contrôle est prêt pour la future cryogénie.'),
 )
 TOOLS={'remove':('Pince',80,35,2),'swap':('Échange',60,25,3),'extra':('Livraison +3',100,45,5)}
 
@@ -173,7 +217,7 @@ class MissionEngine(GameEngine):
                     attempt_id=self.attempt_id,settle_until=self.settle_until,outcome=self.outcome)
     @classmethod
     def restore(cls,data):
-        engine=cls(checked_int(data['index'],0,9),ruleset=checked_int(data.get('ruleset',1),1,2)); old=GameEngine.from_snapshot(data['engine'])
+        engine=cls(checked_int(data['index'],0,len(MISSIONS)-1),ruleset=checked_int(data.get('ruleset',1),1,2)); old=GameEngine.from_snapshot(data['engine'])
         for p in list(engine.pieces.values()): engine._remove_piece(p)
         for key in ('time','score','drops','merge_count','highest_level','completed_circuits',
                     'last_drop','aim_angle','state','combo','_last_merge'):
@@ -206,8 +250,8 @@ def checked_int(value,lo,hi):
 @dataclass
 class Profile:
     credits: int=0
-    stars: list=field(default_factory=lambda:[0]*10)
-    scores: list=field(default_factory=lambda:[0]*10)
+    stars: list=field(default_factory=lambda:[0]*len(MISSIONS))
+    scores: list=field(default_factory=lambda:[0]*len(MISSIONS))
     buildings: int=0
     unlocked: list=field(default_factory=list)
     inventory: dict=field(default_factory=lambda:{k:0 for k in TOOLS})
@@ -217,9 +261,15 @@ class Profile:
     best: int=0
     sound: bool=True
     pc_build: dict|None=None
+    def __post_init__(self):
+        # Migration additive : aucun crédit, record ni montage n'est effacé.
+        for name in ('stars','scores'):
+            values=getattr(self,name)
+            if isinstance(values,list) and len(values)==10:
+                setattr(self,name,values+[0]*(len(MISSIONS)-10))
     @property
     def completed(self): return sum(s>0 for s in self.stars)
-    def available(self,index): return 0<=index<10 and (index==0 or self.stars[index-1]>0)
+    def available(self,index): return 0<=index<len(MISSIONS) and (index==0 or self.stars[index-1]>0)
     def award(self,engine):
         if engine.outcome!='won' or engine.attempt_id in self.receipts: return 0
         i=engine.index; par=engine.mission.par
@@ -254,11 +304,11 @@ class CampaignStore:
             data=json.loads(self.path.read_text(encoding='utf8'))
             if data.pop('version')!=3: raise ValueError('Version inconnue')
             p=Profile(**data)
-            checked_int(p.credits,0,10**12); checked_int(p.buildings,0,5); checked_int(p.best,0,10**12)
-            if len(p.stars)!=10 or len(p.scores)!=10: raise ValueError('Campagne invalide')
+            checked_int(p.credits,0,10**12); checked_int(p.buildings,0,len(BUILDINGS)); checked_int(p.best,0,10**12)
+            if len(p.stars)!=len(MISSIONS) or len(p.scores)!=len(MISSIONS): raise ValueError('Campagne invalide')
             for n in p.stars: checked_int(n,0,3)
             for n in p.scores: checked_int(n,0,10**12)
-            if any(p.stars[i] and not p.stars[i-1] for i in range(1,10)): raise ValueError('Progression discontinue')
+            if any(p.stars[i] and not p.stars[i-1] for i in range(1,len(MISSIONS))): raise ValueError('Progression discontinue')
             if set(p.inventory)!=set(TOOLS) or not set(p.unlocked)<=TOOLS.keys(): raise ValueError('Inventaire invalide')
             for n in p.inventory.values(): checked_int(n,0,10**6)
             if type(p.sound) is not bool: raise ValueError('Son invalide')

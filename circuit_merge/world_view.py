@@ -3,16 +3,16 @@ import math
 import pygame
 from . import config as C
 from .view import View
-from .campaign import MISSIONS,BUILDINGS,TOOLS,MissionEngine
+from .campaign import MISSIONS,BUILDINGS,TOOLS,MissionEngine,CHAPTERS
 from .geometry import geometry_for,landing_y
 from .faces import Personality
 
 class WorldView(View):
     def __init__(self):
         super().__init__()
-        self.world_time=0.; self.worker=Personality(2026)
+        self.chapter=0; self.world_time=0.; self.worker=Personality(2026)
         self.tool=None; self.profile=None; self.flash=0.
-        self.subtitle='V3.2 / Projet Q — Chaque fusion fait avancer le chantier.'
+        self.subtitle='V3.3 / Projet Q — Chaque fusion fait avancer le chantier.'
     def advance_world(self,dt,menu=True):
         self.world_time+=dt; self.worker.advance(dt); self.flash=max(0,self.flash-dt)
         if menu: self.toast_time=max(0,self.toast_time-dt)
@@ -27,7 +27,7 @@ class WorldView(View):
         self.text(subtitle,(34,65),20,C.MUTED)
         self.panel((735,20,352,73),C.ORANGE)
         self.text(f'{p.credits} crédits',(755,32),28,C.ORANGE)
-        self.text(f'{sum(p.stars)} / 30 étoiles   ·   {p.completed} / 10 missions',(755,66),18,C.MUTED)
+        self.text(f'{sum(p.stars)} / {len(MISSIONS)*3} étoiles   ·   {p.completed} / {len(MISSIONS)} missions',(755,66),18,C.MUTED)
     def laboratory(self,p):
         s=self.canvas; n=p.buildings
         self.panel((32,116,675,434),C.TEAL)
@@ -73,7 +73,32 @@ class WorldView(View):
             pygame.draw.ellipse(s,(136,113,191),(406,386,92,28),2)
             for k in range(4):
                 w=88-k*18; pygame.draw.ellipse(s,(111,187,204),(451-w/2,243+k*34,w,17),2)
-            self.text('CHAPITRE 1 TERMINÉ',(443,483),18,C.TEAL,True)
+            self.text('CONTRÔLE OPÉRATIONNEL' if n>=10 else 'LABORATOIRE OPÉRATIONNEL',(443,483),18,C.TEAL,True)
+        # Équipements visibles du chapitre 2 : réseau, horloge, émission, lecture.
+        if n>=6:
+            pygame.draw.lines(s,C.ORANGE,False,[(171,386),(300,451),(551,359),(598,351)],3)
+            for x,y in ((300,451),(551,359)):
+                pygame.draw.rect(s,(41,72,87),(x-20,y-8,40,16),border_radius=3)
+                for k in range(5): pygame.draw.circle(s,C.TEAL,(x-13+k*6,y),2)
+        if n>=7:
+            pygame.draw.rect(s,(38,54,73),(82,253,100,60),border_radius=6)
+            self.text('CLK / SYNC',(91,261),16,C.ORANGE)
+            pulse=[(90+k*4,294-(12 if k%6<3 else 0)) for k in range(21)]
+            pygame.draw.lines(s,C.TEAL,False,pulse,2)
+        if n>=8:
+            pygame.draw.rect(s,(38,54,73),(527,219,123,66),border_radius=6)
+            self.text('COMMANDE',(537,226),16,C.TEAL)
+            wave=[(536+k*2,261+8*math.sin(k*.3+self.world_time*2)) for k in range(52)]
+            pygame.draw.lines(s,C.ORANGE,False,wave,2)
+        if n>=9:
+            pygame.draw.rect(s,(38,54,73),(525,295,123,55),border_radius=6)
+            self.text('ACQUISITION',(532,302),16,C.TEAL)
+            for k in range(12):
+                height=7+int(9*(1+math.sin(k+self.world_time)))
+                pygame.draw.rect(s,C.TEAL,(534+k*9,342-height,5,height))
+        if n>=10:
+            pygame.draw.lines(s,C.TEAL,False,[(182,283),(207,283),(207,207),(587,207),(587,219)],2)
+            pygame.draw.circle(s,C.ORANGE,(int(207+(self.world_time*70)%380),207),4)
         self.component(0,170+40*math.sin(self.world_time*.45),474,22,personality=self.worker,
                        expression='joy' if self.flash else 'idle')
         if self.flash:
@@ -85,29 +110,31 @@ class WorldView(View):
             pygame.draw.rect(self.canvas,(37,60,73),(30,860,1060,32),border_radius=8)
             self.text(self.toast,(45,867),20)
     def render_hub(self,p,mouse,active=None):
-        self.header(p,mouse,'CHAPITRE 1 / FONDATIONS — Un hangar. Une équipe. Un projet quantique.')
+        self.header(p,mouse,f'CHAPITRE {self.chapter+1} / {CHAPTERS[self.chapter].upper()}')
         self.laboratory(p)
         self.panel((734,116,354,280),C.ORANGE)
         self.text('PROCHAINE CONSTRUCTION',(756,138),20,C.ORANGE)
-        if p.buildings<5:
+        if p.buildings<len(BUILDINGS):
             title,price,need,desc=BUILDINGS[p.buildings]
             self.text(title,(756,173),28)
             self.wrapped(desc,756,214,306,22,C.MUTED,25)
             self.text(f'{price} crédits  ·  {need} missions réussies',(756,287),20,C.TEAL)
             self.button('build','Construire',(756,333,309,43),mouse,True)
         else:
-            self.text('Le laboratoire est prêt !',(756,178),26,C.TEAL)
-            self.wrapped('Le premier chapitre est terminé. Rejoue pour les étoiles et prépare tes outils.',756,220,305,22,C.MUTED,26)
+            self.text('Le pilotage est prêt !',(756,178),26,C.TEAL)
+            self.wrapped('Deux chapitres terminés ! La prochaine étape du projet sera la cryogénie.',756,220,305,22,C.MUTED,26)
         self.panel((734,410,354,140))
         self.text('PROJET GLOBAL',(756,430),20,C.MUTED)
         for i in range(5):
-            pygame.draw.rect(self.canvas,C.TEAL if i==0 and p.buildings==5 else C.LINE,(756+i*61,465,51,7),border_radius=3)
-        self.wrapped('Suite du projet : contrôle avancé, cryogénie, qubits et calibration.',756,490,306,18,C.MUTED,20)
+            pygame.draw.rect(self.canvas,C.TEAL if i<min(2,p.buildings//5) else C.LINE,(756+i*61,465,51,7),border_radius=3)
+        self.wrapped('2 chapitres jouables. À venir : cryogénie, qubits et calibration.',756,490,306,18,C.MUTED,20)
         self.button('pc','Mode libre : Montage PC',(735,565,353,43),mouse,True)
-        self.text('LES MISSIONS DU CHAPITRE',(34,570),24)
+        self.button('chapter:0','1 / Fondations',(32,563,275,36),mouse,self.chapter==0)
+        self.button('chapter:1','2 / Contrôle et signaux',(320,563,381,36),mouse,self.chapter==1)
         self.text('Première victoire : prime de recherche. Rejouer : crédits et étoiles.',(34,600),18,C.MUTED)
-        for i,m in enumerate(MISSIONS):
-            x=32+i%5*214; y=631+i//5*82; enabled=p.available(i)
+        for local,m in enumerate(MISSIONS[self.chapter*10:self.chapter*10+10]):
+            i=self.chapter*10+local
+            x=32+local%5*214; y=631+local//5*82; enabled=p.available(i)
             rect=pygame.Rect(x,y,201,70); self.buttons[f'mission:{i}']=rect
             active=enabled and not p.stars[i]
             color=(36,72,80) if active else C.PANEL
